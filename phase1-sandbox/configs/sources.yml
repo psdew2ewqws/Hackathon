@@ -1,33 +1,34 @@
 # YouTube sources for the Phase 1 sandbox.
 #
-# Each entry becomes data/raw/youtube/{slug}.mp4 after `make fetch-videos`.
-#
 # Schema (per item):
-#   url:          string, required — full YouTube (or yt-dlp-supported) URL
+#   url:          string, required
 #   slug:         string, optional — filename stem; auto-derived if omitted
-#   description:  string, optional — human note, copied into methodology.md
-#   start / end:  string, optional — yt-dlp time expressions (e.g. "00:05:00")
-#                 to trim a long stream archive to just the useful portion
-#   tags:         list,   optional — free-form metadata (amman, night, peak, …)
+#   description:  string, optional
+#   start / end:  string, optional — yt-dlp time trim ("HH:MM:SS")
+#   tags:         list, optional
 #
-# RESEARCH NOTE (you fill this list): search YouTube for —
-#   • "Amman traffic live", "Amman intersection CCTV"
-#   • "traffic camera live stream", "intersection 4k traffic"
-#   • GAM (Greater Amman Municipality) channels if any
-#   • Fallback: Tokyo / Seoul / Istanbul fixed-angle traffic live streams
-# A good source is a fixed-camera, wide intersection view, daytime, ≥1080p,
-# ≥10 minutes long, no permanent timestamp/logo overlay over the road.
+# ─── 2026-04-20 curation ─────────────────────────────────────────────────────
+# Neither source is a proper fixed CCTV (they are dashcam / walking tours), but
+# they contain stretches where the camera is effectively stationary (e.g.,
+# stopped at a red light, paused on a pedestrian bridge). We downstream those
+# stationary segments via `ingest.stationary_extractor` into data/normalized/
+# to serve as fixed-view source material for the RTSP simulator.
+#
+# Rejected as too short:
+#   - hdP__3PImRc  "Amman Jordan heavy traffic"       20 s, 720x480   (< 185s)
+#   - IlM_7Nvqa6U  "Sounds of Amman, Jordan"          14 s, 1080p     (< 185s)
 
-sources: []
-# Example (uncomment and edit):
-# sources:
-#   - slug: amman-7th-circle-day
-#     url: https://www.youtube.com/watch?v=XXXXXXXXXXX
-#     description: 7th Circle looking north, daytime, clear weather
-#     start: "00:00:00"
-#     end:   "00:30:00"
-#     tags: [amman, day, 4-approach]
-#   - slug: generic-urban-intersection-night
-#     url: https://www.youtube.com/watch?v=YYYYYYYYYYY
-#     description: Fallback urban intersection for night scenarios
-#     tags: [night, fallback]
+sources:
+  - slug: amman-wadi-saqra-tour
+    url: https://www.youtube.com/watch?v=hsPxEnpuhyw
+    description: >-
+      Wadi Saqra intersection tour — Sharif Al-Radi / Queen Noor / Arar streets.
+      6 min, 1080p. "Tour" in title; extract stationary segments downstream.
+    tags: [amman, wadi-saqra, tour, needs-stationary-extract]
+
+  - slug: amman-7th-circle-drive
+    url: https://www.youtube.com/watch?v=5AtlGb_ANgA
+    description: >-
+      7th Circle & Al Rawnaq 4K sunny-day drive-through during Ramadan.
+      20 min, 4K. Dashcam drive; extract stop-at-red-light segments downstream.
+    tags: [amman, 7th-circle, dashcam, 4k, needs-stationary-extract]

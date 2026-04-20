@@ -13,7 +13,11 @@ VENV_PIP     := $(VENV)/bin/pip
 PYTEST       := $(VENV)/bin/pytest
 
 DATA_DIR             ?= data
+# Default ingest source is youtube/; override to `data/raw/veo3` (or any dir)
+# for generative-model footage:
+#   make normalize-videos RAW_VIDEO_DIR=data/raw/veo3
 RAW_VIDEO_DIR        ?= $(DATA_DIR)/raw/youtube
+VEO3_VIDEO_DIR       ?= $(DATA_DIR)/raw/veo3
 NORMALIZED_VIDEO_DIR ?= $(DATA_DIR)/normalized
 HISTORICAL_DIR       ?= $(DATA_DIR)/historical
 COUNTS_DIR           ?= $(DATA_DIR)/detector_counts
@@ -52,6 +56,14 @@ normalize-videos: setup ## Re-encode raw videos to 1080p/10fps/H.264
 		--in-dir $(RAW_VIDEO_DIR) --out-dir $(NORMALIZED_VIDEO_DIR)
 
 historical-pack: setup ## Slice into $(SANDBOX_DAYS)-day historical structure
+	$(VENV_PY) -m traffic_intel_sandbox.ingest.clip_cutter \
+		--in-dir $(NORMALIZED_VIDEO_DIR) --out-dir $(HISTORICAL_DIR) --days $(SANDBOX_DAYS)
+
+# ─── Veo3 convenience chain ──────────────────────────────────────────────────
+# End-to-end: normalize Veo3 generated MP4s → historical pack, one command.
+veo3-ingest: setup ## Normalize + pack Veo3 videos from data/raw/veo3/
+	$(VENV_PY) -m traffic_intel_sandbox.ingest.normalize \
+		--in-dir $(VEO3_VIDEO_DIR) --out-dir $(NORMALIZED_VIDEO_DIR)
 	$(VENV_PY) -m traffic_intel_sandbox.ingest.clip_cutter \
 		--in-dir $(NORMALIZED_VIDEO_DIR) --out-dir $(HISTORICAL_DIR) --days $(SANDBOX_DAYS)
 
@@ -122,7 +134,7 @@ clean-all: clean ## Also remove raw videos (destructive)
 	rm -rf $(RAW_VIDEO_DIR)/*.mp4
 
 .PHONY: help setup docker-pull \
-        fetch-videos normalize-videos historical-pack \
+        fetch-videos normalize-videos historical-pack veo3-ingest \
         stream-up stream-check stream-down \
         synth-counts synth-signals synth-all \
         validate-metadata \

@@ -16,11 +16,14 @@ The sandbox imitates the operating environment of a single representative inters
 
 ### 3.1 Video (live-like + historical)
 
-1. YouTube URLs are curated manually into `phase1-sandbox/configs/sources.yml`. Selection criteria: fixed camera, wide intersection view, ≥ 1080p, ≥ 10 minutes, no road-covering overlays.
-2. `yt-dlp` downloads each source at `≤1080p mp4` into `data/raw/youtube/`.
-3. `ffmpeg` normalises every raw file into a common profile — 1920×1080, 10 FPS, H.264, `yuv420p`, audio stripped, `+faststart`. This matches the handbook §6.1 assumption exactly.
-4. For the historical pack, `ffmpeg -c copy` cuts three 3-minute clips per day for 14 days, sampling randomly (seeded) from the normalized pool. Clips are filed under `data/historical/YYYY-MM-DD/clip-NN-<window>.mp4`. This is *not* 14 days of unique footage — it is a honest simulation of "representative samples across a 2-week window", documented here and in the filenames.
-5. The RTSP simulator (`MediaMTX` + `ffmpeg -re -stream_loop -1`) loops the first normalized clip indefinitely at `rtsp://localhost:8554/site1`, indistinguishable from a live feed to downstream decoders.
+**Source of truth for v1: Google Veo 3 generative video.** Free YouTube fixed-CCTV footage of Amman intersections is not available at usable quality and duration. Traffic-tour / dashcam substitutes (tested and rejected: Wadi Saqra walking tour, 7th Circle drive-through) are inherently moving-camera content and cannot serve as a fixed-view source even with rigid stabilization. A generative model produces deterministically fixed, arbitrarily many scenarios (day, night, peak, incidents) at consistent framing — a better baseline than imperfect real footage for Phase 1 pipeline validation.
+
+1. Veo 3 prompts (kept in `phase1-sandbox/configs/veo3_prompts.md`, one per scenario) produce 8-second 1080p MP4 clips, dropped into `data/raw/veo3/`.
+2. `ffmpeg` normalises every clip into the common profile — 1920×1080, 10 FPS, H.264, `yuv420p`, audio stripped, `+faststart`. This matches the handbook §6.1 assumption exactly.
+3. For the historical pack, `ffmpeg -c copy` cuts three 3-minute clips per day for 14 days, sampling randomly (seeded) from the normalized pool. Clips are filed under `data/historical/YYYY-MM-DD/clip-NN-<window>.mp4`. Real 14-day continuous footage would be ideal; this sampling is a honest simulation, documented here and in the filenames.
+4. The RTSP simulator (`MediaMTX` + `ffmpeg -re -stream_loop -1`) loops the first normalized clip indefinitely at `rtsp://localhost:8554/site1`, indistinguishable from a live feed to downstream decoders.
+
+**YouTube fallback** (unused in v1, kept operational in case real footage becomes available): the `ingest.youtube_fetch` module downloads from URLs in `phase1-sandbox/configs/sources.yml`, with selection criteria fixed-camera, wide intersection view, ≥ 1080p, ≥ 10 minutes, no road-covering overlays. Auxiliary modules `ingest.stationary_extractor` (finds red-light stops in dashcam drives) and `ingest.stabilize` (rigid video stabilization) are available for salvaging non-ideal sources.
 
 ### 3.2 Detector counts
 

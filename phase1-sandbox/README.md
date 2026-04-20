@@ -19,17 +19,32 @@
 
 ## How the sandbox is built — end to end
 
+**v1 source-of-truth is Google Veo 3 generative video** (see `configs/veo3_prompts.md`). YouTube and other real-footage sources remain operational as fallbacks — see `methodology.md` for the rationale.
+
 ```
-1. YOUTUBE RESEARCH ─────► phase1-sandbox/configs/sources.yml  (you curate URLs)
-2. FETCH        ─────────► data/raw/youtube/*.mp4              (yt-dlp)
-3. NORMALIZE    ─────────► data/normalized/*.mp4               (ffmpeg → 1080p/10fps/H.264)
-4. HISTORICAL PACK ──────► data/historical/YYYY-MM-DD/*.mp4    (ffmpeg -c copy cut)
-5. RTSP SIM     ─────────► rtsp://localhost:8554/site1         (MediaMTX + ffmpeg loop)
-6. SYNTH COUNTS ─────────► data/detector_counts/*.parquet      (numpy + pyarrow)
-7. SYNTH SIGNALS ────────► data/signal_logs/*.ndjson           (stdlib)
-8. METADATA     ─────────► data/metadata/site1.json            (stub → filled by user)
-9. ANNOTATION   ─────────► CVAT at :8080 → data/annotations/*  (CVAT)
-10. VERIFY      ─────────► make sandbox-verify                 (pytest)
+1. VEO 3 GENERATION ─────► data/raw/veo3/*.mp4                 (you generate externally)
+   (OR yt-dlp fallback) ─► data/raw/youtube/*.mp4              (make fetch-videos)
+2. NORMALIZE    ─────────► data/normalized/*.mp4               (ffmpeg → 1080p/10fps/H.264)
+3. HISTORICAL PACK ──────► data/historical/YYYY-MM-DD/*.mp4    (ffmpeg -c copy cut)
+4. RTSP SIM     ─────────► rtsp://localhost:8554/site1         (MediaMTX + ffmpeg loop)
+5. SYNTH COUNTS ─────────► data/detector_counts/*.parquet      (numpy + pyarrow)
+6. SYNTH SIGNALS ────────► data/signal_logs/*.ndjson           (stdlib)
+7. METADATA     ─────────► data/metadata/site1.json            (stub → filled by user)
+8. ANNOTATION   ─────────► CVAT at :8080 → data/annotations/*  (CVAT)
+9. VERIFY       ─────────► make sandbox-verify                 (pytest)
+```
+
+**Quickest path with Veo 3 footage:**
+
+```bash
+# Drop generated clips into data/raw/veo3/
+cp my-veo3-clips/*.mp4 data/raw/veo3/
+
+# One-shot normalize + historical pack
+make veo3-ingest
+
+# Go live
+make sandbox-up stream-check synth-all validate-metadata sandbox-verify
 ```
 
 ### Walk-through

@@ -20,6 +20,10 @@ from pathlib import Path
 
 import yaml
 
+# Use `python -m yt_dlp` so this works whether or not the yt-dlp binary is on
+# PATH (e.g. running from Makefile without venv activation).
+YT_DLP_CMD = [sys.executable, "-m", "yt_dlp"]
+
 SLUG_RE = re.compile(r"[^a-z0-9_-]+")
 
 
@@ -65,7 +69,7 @@ def download(source: Source, out_dir: Path) -> Path:
     # Prefer mp4 at <=1080p; merge if necessary. `--no-playlist` avoids accidental
     # multi-hour playlist downloads. `--concurrent-fragments` speeds DASH streams.
     cmd: list[str] = [
-        "yt-dlp",
+        *YT_DLP_CMD,
         "--no-playlist",
         "--concurrent-fragments", "4",
         "--format", "bv*[height<=1080][ext=mp4]+ba[ext=m4a]/b[height<=1080][ext=mp4]/b[height<=1080]",
