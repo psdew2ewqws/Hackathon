@@ -1,15 +1,17 @@
 #!/usr/bin/env bash
-# publish_loop.sh — publish a normalized MP4 to MediaMTX in an infinite loop,
+# publish_loop.sh — publish normalized MP4s to MediaMTX in an infinite loop,
 # simulating a live RTSP camera feed.
 #
 # Usage:
 #   publish_loop.sh <normalized-video-dir> <rtsp-url>
 #
 # Behavior:
-#   • Picks the first *.mp4 in the directory (alphabetical) as the source.
-#   • Sends -stream_loop -1 -re to produce a steady "live" feed.
-#   • Uses -c copy — no re-encode cost; the video is already 1920x1080 / 10 FPS
-#     from the normalize step.
+#   • Gathers *all* .mp4 files in the directory (alphabetical).
+#   • If one clip: `-stream_loop -1` on that single file (no re-encode).
+#   • If multiple clips: builds an ffmpeg concat playlist and loops it forever
+#     via `-f concat -stream_loop -1`. Re-encodes only if container/codec
+#     parameters differ; otherwise `-c copy` for zero CPU cost.
+#   • Sends at source FPS via `-re` so the RTSP output behaves like a live feed.
 #   • Writes pid to /tmp/traffic-intel-ffmpeg.pid so `make stream-down` can kill it.
 #   • Runs in the background and returns immediately.
 
@@ -22,13 +24,13 @@ shopt -s nullglob
 candidates=( "${in_dir}"/*.mp4 )
 if (( ${#candidates[@]} == 0 )); then
     echo "publish_loop: no .mp4 files in ${in_dir}" >&2
-    echo "Run 'make fetch-videos && make normalize-videos' first." >&2
+    echo "Run 'make veo3-ingest' (or 'make fetch-videos && make normalize-videos') first." >&2
     exit 1
 fi
-src="${candidates[0]}"
 
 pidfile="/tmp/traffic-intel-ffmpeg.pid"
 logfile="/tmp/traffic-intel-ffmpeg.log"
+playlist="/tmp/traffic-intel-playlist.txt"
 
 # If already running, leave it alone (idempotent).
 if [[ -f "$pidfile" ]] && kill -0 "$(cat "$pidfile")" 2>/dev/null; then
@@ -36,17 +38,36 @@ if [[ -f "$pidfile" ]] && kill -0 "$(cat "$pidfile")" 2>/dev/null; then
     exit 0
 fi
 
-echo "publish_loop: streaming ${src}  →  ${rtsp_url}" >&2
+if (( ${#candidates[@]} == 1 )); then
+    src="${candidates[0]}"
+    echo "publish_loop: streaming 1 clip  ${src##*/}  →  ${rtsp_url}" >&2
+    nohup ffmpeg \
+        -hide_banner -loglevel warning \
+        -re -stream_loop -1 \
+        -i "$src" \
+        -c copy \
+        -f rtsp -rtsp_transport tcp \
+        "$rtsp_url" \
+        >"$logfile" 2>&1 &
+else
+    # Multi-clip concat playlist (absolute paths, single-quoted for safety)
+    : > "$playlist"
+    for f in "${candidates[@]}"; do
+        abs="$(readlink -f "$f")"
+        printf "file '%s'\n" "$abs" >> "$playlist"
+    done
+    echo "publish_loop: streaming ${#candidates[@]} clips (concat loop)  →  ${rtsp_url}" >&2
+    for f in "${candidates[@]}"; do echo "   • ${f##*/}" >&2; done
 
-nohup ffmpeg \
-    -hide_banner -loglevel warning \
-    -re \
-    -stream_loop -1 \
-    -i "$src" \
-    -c copy \
-    -f rtsp -rtsp_transport tcp \
-    "$rtsp_url" \
-    >"$logfile" 2>&1 &
+    nohup ffmpeg \
+        -hide_banner -loglevel warning \
+        -re -stream_loop -1 \
+        -f concat -safe 0 -i "$playlist" \
+        -c copy \
+        -f rtsp -rtsp_transport tcp \
+        "$rtsp_url" \
+        >"$logfile" 2>&1 &
+fi
 
 echo $! > "$pidfile"
 sleep 1
