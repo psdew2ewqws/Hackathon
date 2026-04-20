@@ -25,7 +25,10 @@ rtspTransports: [tcp]           # TCP only — deterministic for local dev
 rtspEncryption: "no"
 
 rtmp: no
-hls: no
+hls: yes
+hlsAddress: :8888
+hlsAlwaysRemux: yes
+hlsVariant: mpegts
 webrtc: no
 srt: no
 

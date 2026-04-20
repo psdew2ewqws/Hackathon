@@ -20,6 +20,7 @@ services:
     # RTSP(8554), RTMP(1935), HLS(8888), WebRTC(8889), API(9997), metrics(9998)
     ports:
       - "127.0.0.1:8554:8554"   # RTSP — consumed by ingest layer
+      - "127.0.0.1:8888:8888"   # HLS — browser viewing
       - "127.0.0.1:9997:9997"   # control API (used by healthcheck)
     volumes:
       - ./phase1-sandbox/src/traffic_intel_sandbox/rtsp_sim/mediamtx.yml:/mediamtx.yml:ro

@@ -115,6 +115,9 @@ sandbox-up: stream-up ## Bring sandbox online (stream + core services)
 sandbox-verify: setup ## Run full pytest verification suite
 	$(PYTEST) phase1-sandbox/tests/
 
+viewer: setup ## Open the tiny sandbox preview dashboard at :8000
+	$(VENV_PY) -m traffic_intel_sandbox.viewer
+
 sandbox-down: stream-down annotation-down ## Stop all sandbox services
 
 sandbox-package: ## Tar data + docs into dist/sandbox-v1.tar.zst (needs zstd)
@@ -139,5 +142,5 @@ clean-all: clean ## Also remove raw videos (destructive)
         synth-counts synth-signals synth-all \
         validate-metadata \
         annotation-up annotation-seed annotation-down \
-        sandbox-up sandbox-verify sandbox-down sandbox-package \
+        sandbox-up sandbox-verify sandbox-down sandbox-package viewer \
         clean-synth clean clean-all
