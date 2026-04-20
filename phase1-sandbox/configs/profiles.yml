@@ -1,0 +1,64 @@
+# Traffic demand profile config for synth.detector_counts.
+#
+# Physical meaning:
+#   baseline_rate        — background arrivals (veh/min) when no peak is active.
+#   peaks                — Gaussian pulses (AM / midday / PM).
+#   weekday/weekend_mult — global scaler by day-of-week.
+#   noise_pct            — multiplicative gaussian noise on per-minute rates.
+#   detectors            — 22 detector definitions mirroring the handbook §6.3
+#                          (all approaching lanes plus extras where relevant).
+#
+# Detector id format: DET-{approach}-{lane}-{index}
+#   approach: N/S/E/W
+#   lane:     1-based within approach (1 = rightmost from driver's view)
+#   index:    usually 1; can be >1 for mid-block stop-bar detectors
+
+baseline_rate: 1.5
+weekday_multiplier: 1.00
+weekend_multiplier: 0.55
+noise_pct: 0.15
+
+peaks:
+  - name: am_peak
+    center_min: 480      # 08:00
+    width_min: 45
+    amplitude: 18.0      # veh/min at peak center
+  - name: midday
+    center_min: 780      # 13:00
+    width_min: 60
+    amplitude: 7.0
+  - name: pm_peak
+    center_min: 1050     # 17:30
+    width_min: 60
+    amplitude: 22.0
+
+# ─── 22 detectors ────────────────────────────────────────────────────────────
+# A 4-approach intersection: N and S are the "major" arterial (more lanes,
+# higher base multiplier); E and W are the "minor" cross-street.
+detectors:
+  # North approach — 6 detectors (3 through + 1 left + 1 right + 1 stop-bar)
+  - {id: DET-N-1-1, approach: N, lane: 1, lane_type: right,   base_multiplier: 0.6}
+  - {id: DET-N-2-1, approach: N, lane: 2, lane_type: through, base_multiplier: 1.3}
+  - {id: DET-N-3-1, approach: N, lane: 3, lane_type: through, base_multiplier: 1.4}
+  - {id: DET-N-4-1, approach: N, lane: 4, lane_type: through, base_multiplier: 1.2}
+  - {id: DET-N-5-1, approach: N, lane: 5, lane_type: left,    base_multiplier: 0.5}
+  - {id: DET-N-2-2, approach: N, lane: 2, lane_type: through, base_multiplier: 1.2}
+  # South approach — 6 detectors (mirror of N)
+  - {id: DET-S-1-1, approach: S, lane: 1, lane_type: right,   base_multiplier: 0.6}
+  - {id: DET-S-2-1, approach: S, lane: 2, lane_type: through, base_multiplier: 1.3}
+  - {id: DET-S-3-1, approach: S, lane: 3, lane_type: through, base_multiplier: 1.4}
+  - {id: DET-S-4-1, approach: S, lane: 4, lane_type: through, base_multiplier: 1.2}
+  - {id: DET-S-5-1, approach: S, lane: 5, lane_type: left,    base_multiplier: 0.5}
+  - {id: DET-S-2-2, approach: S, lane: 2, lane_type: through, base_multiplier: 1.2}
+  # East approach — 5 detectors (minor street)
+  - {id: DET-E-1-1, approach: E, lane: 1, lane_type: right,   base_multiplier: 0.35}
+  - {id: DET-E-2-1, approach: E, lane: 2, lane_type: through, base_multiplier: 0.6}
+  - {id: DET-E-3-1, approach: E, lane: 3, lane_type: through, base_multiplier: 0.6}
+  - {id: DET-E-4-1, approach: E, lane: 4, lane_type: left,    base_multiplier: 0.3}
+  - {id: DET-E-2-2, approach: E, lane: 2, lane_type: shared,  base_multiplier: 0.5}
+  # West approach — 5 detectors (minor street)
+  - {id: DET-W-1-1, approach: W, lane: 1, lane_type: right,   base_multiplier: 0.35}
+  - {id: DET-W-2-1, approach: W, lane: 2, lane_type: through, base_multiplier: 0.6}
+  - {id: DET-W-3-1, approach: W, lane: 3, lane_type: through, base_multiplier: 0.6}
+  - {id: DET-W-4-1, approach: W, lane: 4, lane_type: left,    base_multiplier: 0.3}
+  - {id: DET-W-2-2, approach: W, lane: 2, lane_type: shared,  base_multiplier: 0.5}

@@ -1,0 +1,25 @@
+# Signal phase plan for synth.signal_logs.
+#
+# A standard 4-phase NEMA-style plan for a 4-approach intersection:
+#   Phase 2 — N/S through (major)
+#   Phase 6 — S/N left-turn
+#   Phase 4 — E/W through (minor)
+#   Phase 8 — W/E left-turn
+#
+# Sum of all (green + yellow + all_red) = nominal cycle. Keep between 90 and
+# 120 s per handbook §6.4.
+#
+#   phase 2: 35 + 3 + 2 = 40
+#   phase 6: 15 + 3 + 2 = 20
+#   phase 4: 22 + 3 + 2 = 27
+#   phase 8: 10 + 3 + 2 = 15
+#   nominal cycle        = 102 s  ✓ (in 90–120 s range)
+
+phases:
+  - { number: 2, name: "N/S through",   green_s: 35, yellow_s: 3, all_red_s: 2 }
+  - { number: 6, name: "S/N left",      green_s: 15, yellow_s: 3, all_red_s: 2 }
+  - { number: 4, name: "E/W through",   green_s: 22, yellow_s: 3, all_red_s: 2 }
+  - { number: 8, name: "W/E left",      green_s: 10, yellow_s: 3, all_red_s: 2 }
+
+# ± seconds of cycle-level jitter to mimic semi-actuated controller timing.
+cycle_jitter_s: 4

@@ -1,0 +1,43 @@
+# Data artifacts (regenerable)
+data/raw/youtube/*.mp4
+data/raw/youtube/*.webm
+data/raw/youtube/*.mkv
+data/raw/youtube/*.part
+data/normalized/*.mp4
+data/historical/*/
+data/detector_counts/*.parquet
+data/signal_logs/*.ndjson
+data/annotations/coco/*.json
+data/annotations/yolo/*.txt
+data/annotations/events/*.csv
+!data/**/.gitkeep
+
+# Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+dist/
+build/
+
+# Tooling state
+.env
+.env.local
+.DS_Store
+*.log
+
+# Editors
+.idea/
+.vscode/
+*.swp
+
+# Docker volumes (if bind-mounted locally)
+pgdata/
+cvat_data/

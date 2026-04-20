@@ -1,0 +1,50 @@
+# MediaMTX configuration for the Phase 1 RTSP simulator.
+#
+# Only RTSP is enabled — other protocols (RTMP / HLS / WebRTC / SRT) are
+# explicitly disabled to keep the attack surface minimal and match the
+# handbook §11 "analytical isolation" expectation.
+#
+# Authentication is DISABLED because the server binds to 127.0.0.1 only
+# (see docker-compose.yml). Do NOT expose port 8554 beyond localhost.
+
+logLevel: info
+logDestinations: [stdout]
+
+# Global API for healthcheck / metrics ────────────────────────────────────────
+api: yes
+apiAddress: :9997
+
+metrics: no
+pprof: no
+playback: no
+
+# Protocols ──────────────────────────────────────────────────────────────────
+rtsp: yes
+rtspAddress: :8554
+rtspTransports: [tcp]           # TCP only — deterministic for local dev
+rtspEncryption: "no"
+
+rtmp: no
+hls: no
+webrtc: no
+srt: no
+
+# Authentication (local-only, no secrets) ────────────────────────────────────
+authMethod: internal
+authInternalUsers:
+  - user: any
+    pass:
+    ips: [127.0.0.1/32, 172.16.0.0/12, 192.168.0.0/16]
+    permissions:
+      - action: publish
+      - action: read
+      - action: playback
+
+# Per-path config ─────────────────────────────────────────────────────────────
+# site1 = single intersection feed. The ffmpeg publish_loop.sh pushes here.
+paths:
+  site1:
+    source: publisher
+    sourceOnDemand: no
+  all_others:
+    source: publisher

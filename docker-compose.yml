@@ -1,0 +1,101 @@
+# Traffic-Intel local infra.
+#
+# Profiles:
+#   (default)   — mediamtx + postgres  → used by Phase 1 sandbox core
+#   annotation  — adds CVAT stack      → started only when labeling
+#
+# Usage:
+#   docker compose up -d                           # core services
+#   docker compose --profile annotation up -d      # + CVAT
+#
+# All services bind to localhost only. No ports are exposed to the internet.
+
+name: traffic-intel
+
+services:
+  mediamtx:
+    image: bluenviron/mediamtx:1.16.0
+    container_name: traffic-intel-mediamtx
+    restart: unless-stopped
+    # RTSP(8554), RTMP(1935), HLS(8888), WebRTC(8889), API(9997), metrics(9998)
+    ports:
+      - "127.0.0.1:8554:8554"   # RTSP — consumed by ingest layer
+      - "127.0.0.1:9997:9997"   # control API (used by healthcheck)
+    volumes:
+      - ./phase1-sandbox/src/traffic_intel_sandbox/rtsp_sim/mediamtx.yml:/mediamtx.yml:ro
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:9997/v3/config/global/get"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: traffic-intel-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB:       ${POSTGRES_DB:-traffic}
+      POSTGRES_USER:     ${POSTGRES_USER:-traffic}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change_me_locally}
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-traffic} -d ${POSTGRES_DB:-traffic}"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  # ─── Annotation profile (CVAT) ─────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: traffic-intel-redis
+    profiles: ["annotation"]
+    restart: unless-stopped
+
+  cvat-db:
+    image: postgres:16-alpine
+    container_name: traffic-intel-cvat-db
+    profiles: ["annotation"]
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB:       cvat
+      POSTGRES_USER:     cvat
+      POSTGRES_PASSWORD: ${CVAT_DB_PASSWORD:-cvat_local}
+    volumes:
+      - cvat_db_data:/var/lib/postgresql/data
+
+  cvat-server:
+    image: cvat/server:latest
+    container_name: traffic-intel-cvat-server
+    profiles: ["annotation"]
+    restart: unless-stopped
+    depends_on: [cvat-db, redis]
+    environment:
+      CVAT_POSTGRES_HOST: cvat-db
+      CVAT_POSTGRES_USER: cvat
+      CVAT_POSTGRES_PASSWORD: ${CVAT_DB_PASSWORD:-cvat_local}
+      CVAT_REDIS_INMEM_HOST: redis
+      ALLOWED_HOSTS: "*"
+    volumes:
+      - cvat_data:/home/django/data
+      - cvat_keys:/home/django/keys
+      - cvat_logs:/home/django/logs
+      - ./data/historical:/home/django/share/historical:ro
+
+  cvat-ui:
+    image: cvat/ui:latest
+    container_name: traffic-intel-cvat-ui
+    profiles: ["annotation"]
+    restart: unless-stopped
+    depends_on: [cvat-server]
+    ports:
+      - "127.0.0.1:8080:80"
+
+volumes:
+  pgdata:
+  cvat_data:
+  cvat_db_data:
+  cvat_keys:
+  cvat_logs:

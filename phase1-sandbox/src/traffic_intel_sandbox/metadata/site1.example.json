@@ -1,0 +1,90 @@
+{
+  "intersection_id": "SITE1",
+  "location": {
+    "city": "TBD",
+    "country": "Jordan",
+    "lat": 0.0,
+    "lon": 0.0
+  },
+  "camera": {
+    "stream_url": "rtsp://localhost:8554/site1",
+    "resolution": [1920, 1080],
+    "fps": 10,
+    "fov_deg": 90,
+    "mounting_height_m": 8.0,
+    "bearing_deg": 180
+  },
+  "approaches": [
+    {
+      "name": "N",
+      "direction_bearing_deg": 0,
+      "lanes": [
+        { "id": "N-1", "type": "right",   "detector_id": "DET-N-1-1", "width_m": 3.2 },
+        { "id": "N-2", "type": "through", "detector_id": "DET-N-2-1", "width_m": 3.5 },
+        { "id": "N-3", "type": "through", "detector_id": "DET-N-3-1", "width_m": 3.5 },
+        { "id": "N-4", "type": "through", "detector_id": "DET-N-4-1", "width_m": 3.5 },
+        { "id": "N-5", "type": "left",    "detector_id": "DET-N-5-1", "width_m": 3.2 }
+      ]
+    },
+    {
+      "name": "S",
+      "direction_bearing_deg": 180,
+      "lanes": [
+        { "id": "S-1", "type": "right",   "detector_id": "DET-S-1-1", "width_m": 3.2 },
+        { "id": "S-2", "type": "through", "detector_id": "DET-S-2-1", "width_m": 3.5 },
+        { "id": "S-3", "type": "through", "detector_id": "DET-S-3-1", "width_m": 3.5 },
+        { "id": "S-4", "type": "through", "detector_id": "DET-S-4-1", "width_m": 3.5 },
+        { "id": "S-5", "type": "left",    "detector_id": "DET-S-5-1", "width_m": 3.2 }
+      ]
+    },
+    {
+      "name": "E",
+      "direction_bearing_deg": 90,
+      "lanes": [
+        { "id": "E-1", "type": "right",   "detector_id": "DET-E-1-1", "width_m": 3.2 },
+        { "id": "E-2", "type": "through", "detector_id": "DET-E-2-1", "width_m": 3.3 },
+        { "id": "E-3", "type": "through", "detector_id": "DET-E-3-1", "width_m": 3.3 },
+        { "id": "E-4", "type": "left",    "detector_id": "DET-E-4-1", "width_m": 3.2 }
+      ]
+    },
+    {
+      "name": "W",
+      "direction_bearing_deg": 270,
+      "lanes": [
+        { "id": "W-1", "type": "right",   "detector_id": "DET-W-1-1", "width_m": 3.2 },
+        { "id": "W-2", "type": "through", "detector_id": "DET-W-2-1", "width_m": 3.3 },
+        { "id": "W-3", "type": "through", "detector_id": "DET-W-3-1", "width_m": 3.3 },
+        { "id": "W-4", "type": "left",    "detector_id": "DET-W-4-1", "width_m": 3.2 }
+      ]
+    }
+  ],
+  "stop_lines": [
+    { "approach": "N", "polyline_px": [[400, 620], [1520, 620]] },
+    { "approach": "S", "polyline_px": [[400, 460], [1520, 460]] },
+    { "approach": "E", "polyline_px": [[1100, 300], [1100, 780]] },
+    { "approach": "W", "polyline_px": [[820, 300],  [820, 780]] }
+  ],
+  "monitoring_zones": [
+    {
+      "name": "queue_spillback_N",
+      "kind": "queue_spillback",
+      "polygon_px": [[400, 620], [1520, 620], [1520, 900], [400, 900]]
+    },
+    {
+      "name": "queue_spillback_S",
+      "kind": "queue_spillback",
+      "polygon_px": [[400, 180], [1520, 180], [1520, 460], [400, 460]]
+    },
+    {
+      "name": "conflict_zone_center",
+      "kind": "conflict_zone",
+      "polygon_px": [[820, 460], [1100, 460], [1100, 620], [820, 620]]
+    },
+    {
+      "name": "ped_crossing_N",
+      "kind": "ped_crossing",
+      "polygon_px": [[820, 600], [1100, 600], [1100, 640], [820, 640]]
+    }
+  ],
+  "signal_plan_ref": "phase1-sandbox/configs/phase_plan.yml"
+}

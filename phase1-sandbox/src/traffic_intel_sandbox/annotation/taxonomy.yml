@@ -1,0 +1,46 @@
+# Annotation taxonomy for the Phase 1 sandbox (handbook §6.6).
+#
+# Two layers:
+#   1. Object classes (bounding boxes, per-frame) — used for YOLO26 fine-tuning.
+#   2. Event tags (per-frame flags on a clip) — used for incident-detection
+#      validation in Phase 2.
+#
+# Class IDs match COCO's common vehicle subset so YOLO26's pretrained weights
+# transfer cleanly. Pedestrian is included for ped_crossing zone events.
+
+object_classes:
+  - id: 0
+    name: car
+    notes: "Sedan, hatchback, SUV — any light passenger vehicle."
+  - id: 1
+    name: truck
+    notes: ">2 axles, delivery vans included."
+  - id: 2
+    name: bus
+    notes: "Public transit / tour / school bus."
+  - id: 3
+    name: motorcycle
+    notes: "Two-wheeled motorized vehicle."
+  - id: 4
+    name: bicycle
+    notes: "Non-motorized two-wheeled. Scooters count as motorcycle."
+  - id: 5
+    name: pedestrian
+    notes: "On foot. Label only inside or adjacent to monitoring_zones."
+
+event_tags:
+  - id: stalled_vehicle
+    description: "Vehicle stopped >30 s outside a normal queue (breakdown)."
+  - id: abnormal_stop
+    description: "Vehicle stops in a travel lane where flow is expected."
+  - id: unexpected_trajectory
+    description: "Wrong-way, illegal turn, or crossing over lane markings."
+  - id: queue_spillback
+    description: "Queue tail extends beyond its queue_spillback monitoring zone."
+  - id: sudden_congestion
+    description: "Density jumps >threshold in <60 s (flash incident)."
+  - id: normal
+    description: "Baseline — no anomaly present in this window."
+
+# Per-clip event-window CSV schema (exported alongside COCO/YOLO boxes):
+#   clip_id, start_frame, end_frame, tag, notes

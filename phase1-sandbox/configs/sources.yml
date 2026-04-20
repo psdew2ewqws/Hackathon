@@ -1,0 +1,33 @@
+# YouTube sources for the Phase 1 sandbox.
+#
+# Each entry becomes data/raw/youtube/{slug}.mp4 after `make fetch-videos`.
+#
+# Schema (per item):
+#   url:          string, required — full YouTube (or yt-dlp-supported) URL
+#   slug:         string, optional — filename stem; auto-derived if omitted
+#   description:  string, optional — human note, copied into methodology.md
+#   start / end:  string, optional — yt-dlp time expressions (e.g. "00:05:00")
+#                 to trim a long stream archive to just the useful portion
+#   tags:         list,   optional — free-form metadata (amman, night, peak, …)
+#
+# RESEARCH NOTE (you fill this list): search YouTube for —
+#   • "Amman traffic live", "Amman intersection CCTV"
+#   • "traffic camera live stream", "intersection 4k traffic"
+#   • GAM (Greater Amman Municipality) channels if any
+#   • Fallback: Tokyo / Seoul / Istanbul fixed-angle traffic live streams
+# A good source is a fixed-camera, wide intersection view, daytime, ≥1080p,
+# ≥10 minutes long, no permanent timestamp/logo overlay over the road.
+
+sources: []
+# Example (uncomment and edit):
+# sources:
+#   - slug: amman-7th-circle-day
+#     url: https://www.youtube.com/watch?v=XXXXXXXXXXX
+#     description: 7th Circle looking north, daytime, clear weather
+#     start: "00:00:00"
+#     end:   "00:30:00"
+#     tags: [amman, day, 4-approach]
+#   - slug: generic-urban-intersection-night
+#     url: https://www.youtube.com/watch?v=YYYYYYYYYYY
+#     description: Fallback urban intersection for night scenarios
+#     tags: [night, fallback]
