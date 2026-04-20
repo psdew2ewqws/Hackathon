@@ -146,9 +146,14 @@ def run(
             if detections.tracker_id is not None:
                 track_ids_seen.update(int(t) for t in detections.tracker_id if t is not None)
 
-            # Line crossings
+            # Line crossings — LineZone needs tracker_id; skip rows without it
+            tracked_for_lines = detections
+            if detections.tracker_id is not None and len(detections) > 0:
+                m = np.array([t is not None for t in detections.tracker_id])
+                tracked_for_lines = detections[m] if m.any() else None
             for named in lines:
-                named.line.trigger(detections)
+                if tracked_for_lines is not None and len(tracked_for_lines) > 0:
+                    named.line.trigger(tracked_for_lines)
                 crossed = int(named.line.in_count) + int(named.line.out_count)
                 if crossed != line_crossings[named.approach]:
                     delta = crossed - line_crossings[named.approach]
@@ -179,18 +184,35 @@ def run(
             # Annotate (only if we need a video)
             if video_out or show_overlay:
                 annotated = frame.copy()
-                labels = [
-                    f"#{int(tid)} {model.names.get(int(cid), cid)} {c:.2f}"
-                    for tid, cid, c in zip(
-                        detections.tracker_id if detections.tracker_id is not None
-                            else [-1] * n_det,
-                        detections.class_id if detections.class_id is not None
-                            else [-1] * n_det,
-                        detections.confidence if detections.confidence is not None
-                            else [0.0] * n_det,
-                    )
-                ]
-                annotated = trace_annotator.annotate(annotated, detections=detections)
+
+                has_tracker_ids = (
+                    detections.tracker_id is not None
+                    and len(detections) > 0
+                    and any(t is not None for t in detections.tracker_id)
+                )
+
+                # Build labels. Include "#id" prefix only when we actually have it.
+                n_all = len(detections)
+                labels: list[str] = []
+                for i in range(n_all):
+                    tid = None
+                    if detections.tracker_id is not None and i < len(detections.tracker_id):
+                        raw_tid = detections.tracker_id[i]
+                        if raw_tid is not None:
+                            tid = int(raw_tid)
+                    cid = int(detections.class_id[i]) if detections.class_id is not None else -1
+                    conf = float(detections.confidence[i]) if detections.confidence is not None else 0.0
+                    name = model.names.get(cid, str(cid))
+                    tag = f"#{tid} " if tid is not None else ""
+                    labels.append(f"{tag}{name} {conf:.2f}")
+
+                if has_tracker_ids:
+                    # Keep only rows that have a tracker_id for the trace.
+                    mask = np.array([t is not None for t in detections.tracker_id])
+                    tracked_subset = detections[mask]
+                    if len(tracked_subset) > 0:
+                        annotated = trace_annotator.annotate(annotated, detections=tracked_subset)
+
                 annotated = box_annotator.annotate(annotated, detections=detections)
                 annotated = label_annotator.annotate(annotated, detections=detections, labels=labels)
                 for za in zone_annotators:

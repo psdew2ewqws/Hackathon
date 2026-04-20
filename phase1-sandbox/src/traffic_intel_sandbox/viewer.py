@@ -101,6 +101,11 @@ HTML = r"""<!doctype html>
    <div class="events" id="events">loading…</div>
   </section>
 
+  <section style="grid-column: 1 / -1">
+   <h2>Phase 2 detect+track — last 10 events</h2>
+   <div class="events" id="phase2">loading…</div>
+  </section>
+
   <section class="links" style="grid-column: 1 / -1">
    <h2>Handles</h2>
    <div class="kv">
@@ -158,6 +163,10 @@ HTML = r"""<!doctype html>
    try {
     const ev = await fetch('/api/events').then(r => r.json());
     el('events').textContent = ev.lines.join('\n');
+   } catch(e) {}
+   try {
+    const p2 = await fetch('/api/phase2').then(r => r.json());
+    el('phase2').textContent = p2.lines.join('\n');
    } catch(e) {}
  }
  setInterval(poll, 5000); poll();
@@ -236,6 +245,16 @@ def _latest_events(limit: int = 10) -> dict:
     return {"lines": [ln.rstrip() for ln in lines[-limit:]]}
 
 
+def _latest_phase2(limit: int = 10) -> dict:
+    """Tail the Phase 2 detect+track ndjson event log."""
+    path = DATA_DIR / "events" / "phase2.ndjson"
+    if not path.exists():
+        return {"lines": ["(no phase2 events yet — run `make phase2-detect`)"]}
+    with path.open() as fh:
+        lines = fh.readlines()
+    return {"lines": [ln.rstrip() for ln in lines[-limit:]]}
+
+
 def _healthy(rtsp_url: str) -> dict:
     try:
         from traffic_intel_sandbox.rtsp_sim.healthcheck import _probe, evaluate
@@ -280,6 +299,8 @@ def _handler(rtsp_url: str):
                 self._json(_latest_counts())
             elif path == "/api/events":
                 self._json(_latest_events())
+            elif path == "/api/phase2":
+                self._json(_latest_phase2())
             else:
                 self.send_response(404); self.end_headers()
     return H
