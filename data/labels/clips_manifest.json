@@ -1,0 +1,116 @@
+{
+  "version": 1,
+  "schema": "phase1-events-manifest/v1",
+  "intersection_id": "SITE1",
+  "clips": [
+    {
+      "clip": "site1_normal_midday_01",
+      "class": "vehicle / baseline",
+      "tag": null,
+      "frames": 80,
+      "detections": 1131,
+      "tracks": 39,
+      "line_events": 7,
+      "line_crossings": {
+        "N": 1,
+        "S": 0,
+        "E": 4,
+        "W": 2
+      },
+      "zone_events": 65,
+      "max_zone_occupancy": 9,
+      "latency_p50_ms": 354.43,
+      "artifacts": {
+        "raw": "data/raw/veo3/events/site1_normal_midday_01.mp4",
+        "normalized": "data/normalized/events/site1_normal_midday_01.mp4",
+        "annotated": "data/annotated/events/site1_normal_midday_01.mp4",
+        "events": "data/events/per-clip/site1_normal_midday_01.ndjson"
+      },
+      "interpretation": [
+        "7 stop-line crossings distributed across approaches \u2192 healthy flow confirmed"
+      ]
+    },
+    {
+      "clip": "site1_gridlock_01",
+      "class": "congestion / gridlock",
+      "tag": "sudden_congestion",
+      "frames": 80,
+      "detections": 714,
+      "tracks": 41,
+      "line_events": 0,
+      "line_crossings": {
+        "N": 0,
+        "S": 0,
+        "E": 0,
+        "W": 0
+      },
+      "zone_events": 73,
+      "max_zone_occupancy": 10,
+      "latency_p50_ms": 326.84,
+      "artifacts": {
+        "raw": "data/raw/veo3/events/site1_gridlock_01.mp4",
+        "normalized": "data/normalized/events/site1_gridlock_01.mp4",
+        "annotated": "data/annotated/events/site1_gridlock_01.mp4",
+        "events": "data/events/per-clip/site1_gridlock_01.ndjson"
+      },
+      "interpretation": [
+        "0 line crossings despite max 10 vehicles in queue zone \u2192 gridlock signature confirmed"
+      ]
+    },
+    {
+      "clip": "site1_red-runner_01",
+      "class": "unexpected_trajectory",
+      "tag": "unexpected_trajectory",
+      "frames": 80,
+      "detections": 788,
+      "tracks": 26,
+      "line_events": 0,
+      "line_crossings": {
+        "N": 0,
+        "S": 0,
+        "E": 0,
+        "W": 0
+      },
+      "zone_events": 40,
+      "max_zone_occupancy": 9,
+      "latency_p50_ms": 212.65,
+      "artifacts": {
+        "raw": "data/raw/veo3/events/site1_red-runner_01.mp4",
+        "normalized": "data/normalized/events/site1_red-runner_01.mp4",
+        "annotated": "data/annotated/events/site1_red-runner_01.mp4",
+        "events": "data/events/per-clip/site1_red-runner_01.ndjson"
+      },
+      "interpretation": [
+        "no stop-line crossings despite moving vehicles \u2192 possible red-running path outside defined lines"
+      ]
+    },
+    {
+      "clip": "site1_wrongway_01",
+      "class": "unexpected_trajectory",
+      "tag": "unexpected_trajectory",
+      "frames": 80,
+      "detections": 1121,
+      "tracks": 60,
+      "line_events": 11,
+      "line_crossings": {
+        "N": 6,
+        "S": 1,
+        "E": 3,
+        "W": 2
+      },
+      "zone_events": 104,
+      "max_zone_occupancy": 8,
+      "latency_p50_ms": 245.11,
+      "artifacts": {
+        "raw": "data/raw/veo3/events/site1_wrongway_01.mp4",
+        "normalized": "data/normalized/events/site1_wrongway_01.mp4",
+        "annotated": "data/annotated/events/site1_wrongway_01.mp4",
+        "events": "data/events/per-clip/site1_wrongway_01.ndjson"
+      },
+      "interpretation": [
+        "60 unique tracks (2x baseline) \u2192 ID churn consistent with wrong-way or erratic motion"
+      ]
+    }
+  ],
+  "note": "weak-supervision event tags derived from YOLO26 + BoT-SORT + zone/line primitives. line_crossings=0 with high max_zone_occupancy is a strong gridlock signal; line crossings on multiple approaches simultaneously without matching green phase suggests unexpected trajectory."
+}
