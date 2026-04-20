@@ -22,7 +22,9 @@ from __future__ import annotations
 import argparse
 import os
 import sys
+import threading
 import time
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 import cv2
@@ -32,6 +34,112 @@ from ultralytics import YOLO
 
 from .events import EventLog
 from .zones import load_stop_lines, load_zones
+
+
+class _MjpegBroadcaster:
+    """Thread-safe latest-frame buffer + HTTP MJPEG server.
+
+    One writer (the detector) updates the latest frame; many readers (the
+    browser tabs) pull it via /stream.mjpeg as multipart/x-mixed-replace.
+    We only ever hold the most recent frame — slow readers never block fast
+    producers, they just see dropped frames.
+    """
+
+    def __init__(self, port: int, jpeg_quality: int = 72) -> None:
+        self.port = port
+        self._jpeg_quality = jpeg_quality
+        self._cv = threading.Condition()
+        self._latest_jpeg: bytes | None = None
+        self._stop = threading.Event()
+        self._server: ThreadingHTTPServer | None = None
+
+    def update(self, bgr_frame: np.ndarray) -> None:
+        ok, buf = cv2.imencode(".jpg", bgr_frame,
+                               [int(cv2.IMWRITE_JPEG_QUALITY), self._jpeg_quality])
+        if not ok:
+            return
+        with self._cv:
+            self._latest_jpeg = buf.tobytes()
+            self._cv.notify_all()
+
+    def _wait_for_frame(self, timeout: float = 5.0) -> bytes | None:
+        with self._cv:
+            if self._latest_jpeg is None:
+                self._cv.wait(timeout=timeout)
+            return self._latest_jpeg
+
+    @staticmethod
+    def _handler_cls(broadcaster: "_MjpegBroadcaster"):
+        class H(BaseHTTPRequestHandler):
+            def log_message(self, fmt, *args): pass
+
+            # Any exception in handle() should just end the connection — never
+            # propagate up and tear down the producer loop.
+            def handle_one_request(self):  # noqa: N802
+                try:
+                    return super().handle_one_request()
+                except (BrokenPipeError, ConnectionResetError, OSError, ValueError):
+                    return
+                except Exception:
+                    return
+
+            def do_GET(self):  # noqa: N802
+                if self.path.startswith("/stream.mjpeg"):
+                    boundary = "frame"
+                    try:
+                        self.send_response(200)
+                        self.send_header("Age", "0")
+                        self.send_header("Cache-Control", "no-cache, private")
+                        self.send_header("Pragma", "no-cache")
+                        self.send_header("Content-Type",
+                                         f"multipart/x-mixed-replace; boundary={boundary}")
+                        self.end_headers()
+                    except (BrokenPipeError, ConnectionResetError, OSError):
+                        return
+                    while not broadcaster._stop.is_set():
+                        jpeg = broadcaster._wait_for_frame(timeout=1.0)
+                        if jpeg is None:
+                            continue
+                        try:
+                            self.wfile.write(
+                                f"--{boundary}\r\n".encode()
+                                + b"Content-Type: image/jpeg\r\n"
+                                + f"Content-Length: {len(jpeg)}\r\n\r\n".encode()
+                                + jpeg
+                                + b"\r\n"
+                            )
+                            self.wfile.flush()
+                        except (BrokenPipeError, ConnectionResetError, OSError, ValueError):
+                            return
+                        except Exception:
+                            return
+                elif self.path in ("/", "/index.html"):
+                    html = (
+                        b"<!doctype html><meta charset=utf-8>"
+                        b"<title>Phase 2 live</title>"
+                        b"<style>body{margin:0;background:#000}img{width:100%;height:100vh;object-fit:contain}</style>"
+                        b"<img src=/stream.mjpeg>"
+                    )
+                    self.send_response(200)
+                    self.send_header("Content-Type", "text/html; charset=utf-8")
+                    self.end_headers()
+                    self.wfile.write(html)
+                else:
+                    self.send_response(404); self.end_headers()
+        return H
+
+    def start(self) -> None:
+        self._server = ThreadingHTTPServer(("127.0.0.1", self.port),
+                                           self._handler_cls(self))
+        t = threading.Thread(target=self._server.serve_forever, daemon=True)
+        t.start()
+        print(f"[mjpeg] serving on http://127.0.0.1:{self.port}/stream.mjpeg",
+              file=sys.stderr)
+
+    def stop(self) -> None:
+        self._stop.set()
+        if self._server:
+            self._server.shutdown()
 
 # COCO class IDs for the vehicle subset we actually care about.
 # 2=car, 3=motorcycle, 5=bus, 7=truck
@@ -67,6 +175,7 @@ def run(
     max_frames: int | None = None,
     device: str | None = None,
     show_overlay: bool = False,
+    mjpeg_port: int | None = None,
 ) -> dict:
     """Run detect + track. Returns a summary dict."""
 
@@ -110,6 +219,12 @@ def run(
     # Video writer (lazy — we need first frame to get size)
     writer: cv2.VideoWriter | None = None
     writer_size: tuple[int, int] | None = None
+
+    # MJPEG broadcaster (optional — live browser view)
+    mjpeg: _MjpegBroadcaster | None = None
+    if mjpeg_port:
+        mjpeg = _MjpegBroadcaster(port=mjpeg_port)
+        mjpeg.start()
 
     # Summary accumulators
     started = time.monotonic()
@@ -181,8 +296,8 @@ def run(
                         count=inside, prev=prev, frame=frame_count,
                     )
 
-            # Annotate (only if we need a video)
-            if video_out or show_overlay:
+            # Annotate (only if we need a video, mjpeg stream, or on-screen)
+            if video_out or show_overlay or mjpeg is not None:
                 annotated = frame.copy()
 
                 has_tracker_ids = (
@@ -229,6 +344,8 @@ def run(
                         print(f"[phase2] writing annotated video → {video_out}  ({w}x{h})",
                               file=sys.stderr)
                     writer.write(annotated)
+                if mjpeg is not None:
+                    mjpeg.update(annotated)
                 if show_overlay:
                     cv2.imshow("phase2", annotated)
                     if cv2.waitKey(1) & 0xFF == ord("q"):
@@ -253,6 +370,8 @@ def run(
             writer.release()
         if show_overlay:
             cv2.destroyAllWindows()
+        if mjpeg is not None:
+            mjpeg.stop()
 
     elapsed = time.monotonic() - started
     summary = {
@@ -293,6 +412,8 @@ def main(argv: list[str] | None = None) -> int:
                    help="Stop after N frames (useful for benchmarking)")
     p.add_argument("--device", default=None, help="'0' (GPU), 'cpu', or None (auto)")
     p.add_argument("--show", action="store_true", help="Show annotated window (requires GUI)")
+    p.add_argument("--mjpeg-port", type=int, default=None,
+                   help="Also serve annotated frames as MJPEG on http://127.0.0.1:<port>/stream.mjpeg")
     args = p.parse_args(argv)
 
     run(
@@ -308,6 +429,7 @@ def main(argv: list[str] | None = None) -> int:
         max_frames=args.max_frames,
         device=args.device,
         show_overlay=args.show,
+        mjpeg_port=args.mjpeg_port,
     )
     return 0
 
