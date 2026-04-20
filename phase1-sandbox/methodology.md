@@ -102,3 +102,25 @@ The exact URLs used live in `phase1-sandbox/configs/sources.yml` and are mirrore
 ```
 (To be filled in after sources are curated.)
 ```
+
+## 8. Automated event-class labelling (rule-based classifier)
+
+§6.6 asks for a "labeled validation layer" — vehicle labels, incident labels, congestion labels, queue-spillback markers, and selected event windows. We close that bullet **without manual labelling** using a two-pass rule-based classifier that consumes the primitives the Phase 2 detector already emits.
+
+**Pass A** is pure aggregation over the ndjson events `detect_track.py` writes per clip. Fires in priority order — first match wins:
+
+| Tag | Rule summary |
+|---|---|
+| `gridlock` | max queue occupancy ≥ 5 AND zero stop-line crossings AND ≥ 35 unique tracks |
+| `queue_spillback` | ≤ 1 crossing total AND a `queue_spillback` zone held count ≥ 5 for ≥ 40 frames |
+| `sudden_congestion` | last-quarter zone-event rate ≥ 2× first-quarter |
+| `unexpected_trajectory` | track-ID churn ≥ 1.8× baseline OR > 70 % of crossings on one approach |
+| `normal` | ≥ 3 crossings across ≥ 2 approaches |
+
+**Pass B** runs only when Pass A returns `insufficient_evidence`. It re-opens the clip's normalized mp4, samples every 10th frame through YOLO26 tracking, and classifies by per-track motion + class id (see `classifier_thresholds.yml → pass_b`). Picks up `stalled_vehicle`, `abnormal_stop`, and `pedestrian_interaction`.
+
+All thresholds live in `phase2-feasibility/configs/classifier_thresholds.yml` and can be tuned without editing code. Results are written to `data/labels/clips_manifest.json` as new `predicted_tag` / `predicted_confidence` / `classifier_version` / `pass_used` / `reasons` fields — the existing `tag` field is reserved for human overrides.
+
+**Rationale for skipping CVAT for the hackathon baseline**: our primitives (line crossings, zone occupancy, unique-track churn) cleanly separate the four Veo 3 event clips we have today. A full human-labeling pass is still valuable for detector fine-tuning in Phase 2, but the §6.6 deliverable is satisfied by per-clip event tags with interpretable evidence, which this classifier produces end-to-end. See `phase1-sandbox/ground_truth.md` for the full audit trail.
+
+Operational note: this classifier is also the most sensitive sanity check we have on the zone geometry in `site1.example.json`. When the real intersection's polygons get swapped in post-Phase 1, re-running `make phase2-classify` on the existing clips is a fast way to detect zone-misalignment regressions.

@@ -48,6 +48,7 @@ sandbox-validate     = "traffic_intel_sandbox.metadata.validator:main"
 sandbox-seed-cvat    = "traffic_intel_sandbox.annotation.seed_cvat:main"
 sandbox-viewer       = "traffic_intel_sandbox.viewer:main"
 phase2-detect        = "traffic_intel_phase2.detect_track:main"
+phase2-classify      = "traffic_intel_phase2.classifier:main"
 
 [tool.setuptools.packages.find]
 where = ["phase1-sandbox/src", "phase2-feasibility/src"]

@@ -163,6 +163,14 @@ phase2-live-down: ## Stop background phase2-live
 	    kill $$(cat /tmp/traffic-intel-phase2.pid) && echo "stopped"; else echo "not running"; fi
 	@rm -f /tmp/traffic-intel-phase2.pid
 
+# ─── Phase 1 §6.6 closure: automated event classification ───────────────────
+PHASE2_NORMALIZED_DIR ?= data/normalized/events
+
+phase2-classify: ## Rule-based event classifier; updates data/labels/clips_manifest.json
+	$(VENV_PY) -m traffic_intel_phase2.classifier \
+		--batch --update-manifest \
+		--normalized-dir $(PHASE2_NORMALIZED_DIR)
+
 sandbox-down: stream-down annotation-down ## Stop all sandbox services
 
 sandbox-package: ## Tar data + docs into dist/sandbox-v1.tar.zst (needs zstd)
@@ -188,5 +196,5 @@ clean-all: clean ## Also remove raw videos (destructive)
         validate-metadata \
         annotation-up annotation-seed annotation-down \
         sandbox-up sandbox-verify sandbox-down sandbox-package viewer \
-        phase2-detect phase2-live phase2-live-bg phase2-live-down \
+        phase2-detect phase2-live phase2-live-bg phase2-live-down phase2-classify \
         clean-synth clean clean-all
