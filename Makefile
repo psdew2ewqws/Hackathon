@@ -69,7 +69,7 @@ veo3-ingest: setup ## Normalize + pack Veo3 videos from data/raw/veo3/
 
 # ─── RTSP stream ─────────────────────────────────────────────────────────────
 stream-up: ## Start MediaMTX + publish first normalized clip in a loop
-	docker compose up -d mediamtx postgres
+	docker compose up -d mediamtx
 	bash phase1-sandbox/scripts/publish_loop.sh $(NORMALIZED_VIDEO_DIR) $(RTSP_URL)
 
 stream-check: setup ## Verify RTSP resolution + FPS + codec

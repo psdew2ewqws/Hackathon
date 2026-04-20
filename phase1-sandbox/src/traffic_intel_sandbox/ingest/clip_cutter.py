@@ -26,7 +26,7 @@ WINDOWS: list[tuple[str, str]] = [
     ("midday",    "12:30:00"),
     ("pm_peak",   "17:30:00"),
 ]
-CLIP_SECONDS = 180   # 3-minute clips
+DEFAULT_CLIP_SECONDS = 180   # 3-minute clips for long sources
 
 
 def _ffmpeg_bin() -> str:
@@ -66,20 +66,36 @@ def build_pack(
     days: int,
     start_date: date,
     seed: int = 42,
+    clip_seconds: int = DEFAULT_CLIP_SECONDS,
 ) -> int:
-    """Write ``days`` day-directories, each with a clip per window."""
+    """Write ``days`` day-directories, each with a clip per window.
+
+    If all source videos are shorter than ``clip_seconds``, the clip length is
+    automatically reduced to match the shortest source's duration (minus a 1 s
+    safety margin). This makes the cutter work for short generative clips
+    (e.g. 8 s Veo 3 outputs) without ceremony.
+    """
     rng = random.Random(seed)
     sources = sorted(in_dir.glob("*.mp4"))
     if not sources:
         print(f"[warn] no normalized mp4s in {in_dir}", file=sys.stderr)
         return 0
     durations = {p: _probe_duration_sec(p) for p in sources}
-    usable = [p for p, d in durations.items() if d >= CLIP_SECONDS + 5]
+    usable = [p for p, d in durations.items() if d >= clip_seconds + 5]
     if not usable:
-        raise RuntimeError(
-            f"All sources shorter than {CLIP_SECONDS}s — cannot cut clips. "
-            "Download longer videos or lower CLIP_SECONDS."
+        # Fallback: shrink clip_seconds to fit the longest available source.
+        longest = max(durations.values())
+        if longest < 3:
+            raise RuntimeError(
+                f"No source is at least 3s long; longest is {longest:.1f}s. Check inputs."
+            )
+        new_seconds = max(1, int(longest) - 1)
+        print(
+            f"[warn] all sources shorter than {clip_seconds}s; shrinking clip length to {new_seconds}s",
+            file=sys.stderr,
         )
+        clip_seconds = new_seconds
+        usable = [p for p, d in durations.items() if d >= clip_seconds]
 
     out_dir.mkdir(parents=True, exist_ok=True)
     total_clips = 0
@@ -89,12 +105,12 @@ def build_pack(
         day_dir.mkdir(exist_ok=True)
         for win_idx, (win_name, _win_time) in enumerate(WINDOWS, start=1):
             src = rng.choice(usable)
-            max_start = max(0.0, durations[src] - CLIP_SECONDS - 1)
+            max_start = max(0.0, durations[src] - clip_seconds - 0.5)
             start_s = rng.uniform(0, max_start)
             dst = day_dir / f"clip-{win_idx:02d}-{win_name}.mp4"
             if dst.exists() and dst.stat().st_size > 0:
                 continue
-            _cut(src, start_s, CLIP_SECONDS, dst)
+            _cut(src, start_s, clip_seconds, dst)
             total_clips += 1
             print(f"[cut] {d} {win_name:<8}  ← {src.name} @ {start_s:6.1f}s  →  {dst.name}", file=sys.stderr)
     return total_clips
@@ -108,6 +124,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--start-date", type=str, default=None,
                         help="ISO date; defaults to (today - days)")
     parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--clip-seconds", type=int, default=DEFAULT_CLIP_SECONDS,
+                        help="Per-window clip length; auto-shrinks if all sources are shorter")
     args = parser.parse_args(argv)
 
     start = (
@@ -115,7 +133,8 @@ def main(argv: list[str] | None = None) -> int:
         if args.start_date
         else date.today() - timedelta(days=args.days)
     )
-    n = build_pack(args.in_dir, args.out_dir, args.days, start, args.seed)
+    n = build_pack(args.in_dir, args.out_dir, args.days, start, args.seed,
+                   clip_seconds=args.clip_seconds)
     print(f"[done] {n} clips written into {args.out_dir}", file=sys.stderr)
     return 0
 
