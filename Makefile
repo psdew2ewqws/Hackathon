@@ -118,6 +118,59 @@ sandbox-verify: setup ## Run full pytest verification suite
 viewer: setup ## Open the tiny sandbox preview dashboard at :8000
 	$(VENV_PY) -m traffic_intel_sandbox.viewer
 
+# ─── Phase 2: YOLO26 detect + track ──────────────────────────────────────────
+PHASE2_MODEL   ?= yolo26n.pt
+PHASE2_TRACKER ?= botsort.yaml
+PHASE2_SECONDS ?= 30
+PHASE2_EVENTS  ?= data/events/phase2.ndjson
+PHASE2_VIDEO   ?= data/annotated/phase2.mp4
+
+phase2-detect: setup ## Run YOLO26 + BoT-SORT on live RTSP, save annotated video + events
+	mkdir -p $(dir $(PHASE2_EVENTS)) $(dir $(PHASE2_VIDEO))
+	$(VENV_PY) -m traffic_intel_phase2.detect_track \
+		--source $(RTSP_URL) \
+		--model  $(PHASE2_MODEL) \
+		--tracker $(PHASE2_TRACKER) \
+		--events-out $(PHASE2_EVENTS) \
+		--video-out  $(PHASE2_VIDEO) \
+		--max-frames $$(( $(PHASE2_SECONDS) * 10 ))
+
+PHASE2_MJPEG_PORT ?= 8081
+phase2-live: setup ## Run detection unbounded, stream annotated MJPEG on :8081
+	mkdir -p $(dir $(PHASE2_EVENTS))
+	@echo "→ Open  http://localhost:$(PHASE2_MJPEG_PORT)/stream.mjpeg  (or the viewer at :8000)"
+	$(VENV_PY) -m traffic_intel_phase2.detect_track \
+		--source $(RTSP_URL) \
+		--model  $(PHASE2_MODEL) \
+		--tracker $(PHASE2_TRACKER) \
+		--events-out $(PHASE2_EVENTS) \
+		--mjpeg-port $(PHASE2_MJPEG_PORT)
+
+phase2-live-bg: setup ## Same as phase2-live but in background (make phase2-live-down to stop)
+	mkdir -p $(dir $(PHASE2_EVENTS))
+	@if [ -f /tmp/traffic-intel-phase2.pid ] && kill -0 $$(cat /tmp/traffic-intel-phase2.pid) 2>/dev/null; then \
+	    kill $$(cat /tmp/traffic-intel-phase2.pid) 2>/dev/null || true; sleep 1; fi
+	@nohup $(VENV_PY) -m traffic_intel_phase2.detect_track \
+		--source $(RTSP_URL) --model $(PHASE2_MODEL) --tracker $(PHASE2_TRACKER) \
+		--events-out $(PHASE2_EVENTS) --mjpeg-port $(PHASE2_MJPEG_PORT) \
+		> /tmp/traffic-intel-phase2.log 2>&1 & echo $$! > /tmp/traffic-intel-phase2.pid
+	@sleep 2
+	@echo "phase2-live pid $$(cat /tmp/traffic-intel-phase2.pid)  log=/tmp/traffic-intel-phase2.log"
+	@echo "→ Open http://localhost:$(PHASE2_MJPEG_PORT)/stream.mjpeg  (or the viewer at :8000)"
+
+phase2-live-down: ## Stop background phase2-live
+	@if [ -f /tmp/traffic-intel-phase2.pid ] && kill -0 $$(cat /tmp/traffic-intel-phase2.pid) 2>/dev/null; then \
+	    kill $$(cat /tmp/traffic-intel-phase2.pid) && echo "stopped"; else echo "not running"; fi
+	@rm -f /tmp/traffic-intel-phase2.pid
+
+# ─── Phase 1 §6.6 closure: automated event classification ───────────────────
+PHASE2_NORMALIZED_DIR ?= data/normalized/events
+
+phase2-classify: ## Rule-based event classifier; updates data/labels/clips_manifest.json
+	$(VENV_PY) -m traffic_intel_phase2.classifier \
+		--batch --update-manifest \
+		--normalized-dir $(PHASE2_NORMALIZED_DIR)
+
 sandbox-down: stream-down annotation-down ## Stop all sandbox services
 
 sandbox-package: ## Tar data + docs into dist/sandbox-v1.tar.zst (needs zstd)
@@ -143,4 +196,5 @@ clean-all: clean ## Also remove raw videos (destructive)
         validate-metadata \
         annotation-up annotation-seed annotation-down \
         sandbox-up sandbox-verify sandbox-down sandbox-package viewer \
+        phase2-detect phase2-live phase2-live-bg phase2-live-down phase2-classify \
         clean-synth clean clean-all

@@ -147,3 +147,43 @@ phases:
   - { number: <1..8>, name: <str>, green_s: <num>, yellow_s: <num>, all_red_s: <num> }
 cycle_jitter_s: <num>    # ± seconds added per cycle to mimic actuation
 ```
+
+---
+
+## 8. Clip classification manifest (`data/labels/clips_manifest.json`)
+
+Written by `phase2-classify` (rule-based classifier — see `phase1-sandbox/ground_truth.md`). Schema version 1.
+
+Top-level:
+
+```json
+{
+  "version": 1,
+  "schema": "phase1-events-manifest/v1",
+  "intersection_id": "SITE1",
+  "note": "...",
+  "clips": [ { ...per-clip block... } ]
+}
+```
+
+Per-clip fields:
+
+| Field | Type | Written by | Notes |
+|---|---|---|---|
+| `clip` | string | `phase2-detect` | Stem matching `data/normalized/events/<clip>.mp4` |
+| `class` | string | human | Free-text description from prompt/source |
+| `tag` | string \| null | **human only** | Reserved for hand-labeled ground truth; never overwritten by the classifier |
+| `frames` | int | `phase2-detect` | Frame count at inference |
+| `detections` | int | `phase2-detect` | Sum of per-frame detection counts |
+| `tracks` | int | `phase2-detect` | Unique BoT-SORT track IDs seen |
+| `line_events` / `zone_events` | int | `phase2-detect` | Count of ndjson events of each type |
+| `line_crossings` | object | `phase2-detect` | `{N, S, E, W → int}` |
+| `max_zone_occupancy` | int | `phase2-detect` | Max count observed in any monitoring zone |
+| `latency_p50_ms` | float | `phase2-detect` | Inference p50 latency per frame |
+| `artifacts` | object | `phase2-detect` | Paths to raw / normalized / annotated mp4s + ndjson |
+| `interpretation` | array[string] | human | Free-text observations (optional) |
+| `predicted_tag` | string | **`phase2-classify`** | One of: `normal`, `gridlock`, `queue_spillback`, `sudden_congestion`, `unexpected_trajectory`, `stalled_vehicle`, `abnormal_stop`, `pedestrian_interaction`, `insufficient_evidence` |
+| `predicted_confidence` | float | **`phase2-classify`** | Heuristic margin [0.50 .. 0.99]; see `ground_truth.md` |
+| `classifier_version` | string | **`phase2-classify`** | Pinned to `classifier_thresholds.yml → version` |
+| `pass_used` | string | **`phase2-classify`** | `"A"` (ndjson rules) or `"B"` (video re-sample) |
+| `reasons` | array[string] | **`phase2-classify`** | Human-readable explanation of which rule(s) fired |

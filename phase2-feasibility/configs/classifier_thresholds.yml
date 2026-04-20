@@ -1,0 +1,72 @@
+# Thresholds for the rule-based event classifier.
+#
+# All numbers here are the knobs a reviewer/operator can turn without
+# touching code. The defaults were calibrated on the four Veo-3 event
+# clips in data/raw/veo3/events/ and validated against
+# data/labels/clips_manifest.json → `interpretation` field.
+#
+# Any change here should be re-verified with:
+#   .venv/bin/pytest phase2-feasibility/tests/test_classifier.py
+
+version: "v1.0-rules"
+
+# ── Pass A — rules over the per-clip ndjson ─────────────────────────────────
+pass_a:
+
+  # gridlock: many vehicles present, nothing moves
+  gridlock:
+    max_zone_occupancy_min: 5        # queues must hold at least this many
+    line_crossings_total_max: 0      # no stop-line crossing at all
+    min_unique_tracks: 35            # need a dense scene (not just a few stopped cars)
+    min_frames: 40                   # reject trivially short clips
+
+  # queue_spillback: queue_spillback-kind zone stays populated AND isn't draining
+  queue_spillback:
+    min_count_per_frame: 5           # ≥ 5 vehicles inside the zone (was 3 — too lenient)
+    min_sustained_frames: 40         # for at least 40 frames in a row (was 30)
+    max_line_crossings_total: 1      # if >1 crossing anywhere, flow exists → not spillback
+
+  # sudden_congestion: detection rate climbs fast
+  sudden_congestion:
+    last_quarter_multiplier: 2.0     # last-quarter det count >= 2x first-quarter
+
+  # unexpected_trajectory: either tracker-id churn or imbalanced crossings
+  unexpected_trajectory:
+    track_churn_ratio_min: 1.8       # unique_tracks / median_baseline_tracks
+    baseline_tracks: 32              # median observed on normal clips
+    approach_concentration_min: 0.70 # >=70% of crossings on one approach
+
+  # normal: the positive-case sanity rule
+  normal:
+    min_total_crossings: 3
+    min_approaches_with_crossings: 2
+
+# ── Pass B — only fires when Pass A returns insufficient_evidence ───────────
+# Pass B samples the video file itself and looks at per-track motion.
+# Skipped entirely if no `--normalized-dir` is given to the classifier CLI.
+pass_b:
+
+  sample_every_n_frames: 10          # coarse enough for 8s @ 10fps = 8 samples
+  min_track_samples: 3               # reject tracks seen fewer times than this
+
+  stalled_vehicle:
+    max_mean_speed_pxps: 3.0         # pixels / second across track lifetime
+    outside_queue_zones: true        # must be outside queue_spillback zones
+
+  abnormal_stop:
+    max_mean_speed_pxps: 3.0
+    inside_zone_kinds:               # must be inside at least one of these
+      - conflict_zone
+      - approach_area
+
+  pedestrian_interaction:
+    coco_pedestrian_class_id: 5
+    adjacent_zone_kinds:
+      - ped_crossing
+
+# ── Confidence scoring ──────────────────────────────────────────────────────
+# Simple normalized-margin heuristic, documented in ground_truth.md.
+confidence:
+  clip_min: 0.35          # anything below this is reported as low-confidence
+  floor: 0.50             # margin below this maps to 0.50 confidence
+  saturate_at: 3.0        # margin above this maps to 0.99 confidence
