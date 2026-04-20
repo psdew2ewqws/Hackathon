@@ -47,3 +47,5 @@ data/_rejected/
 data/test_stab/
 data/raw/veo3/*.mp4
 data/raw/veo3/*.webm
+data/events/
+data/annotated/

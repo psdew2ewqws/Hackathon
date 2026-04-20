@@ -118,6 +118,23 @@ sandbox-verify: setup ## Run full pytest verification suite
 viewer: setup ## Open the tiny sandbox preview dashboard at :8000
 	$(VENV_PY) -m traffic_intel_sandbox.viewer
 
+# ─── Phase 2: YOLO26 detect + track ──────────────────────────────────────────
+PHASE2_MODEL   ?= yolo26n.pt
+PHASE2_TRACKER ?= botsort.yaml
+PHASE2_SECONDS ?= 30
+PHASE2_EVENTS  ?= data/events/phase2.ndjson
+PHASE2_VIDEO   ?= data/annotated/phase2.mp4
+
+phase2-detect: setup ## Run YOLO26 + BoT-SORT on live RTSP, save annotated video + events
+	mkdir -p $(dir $(PHASE2_EVENTS)) $(dir $(PHASE2_VIDEO))
+	$(VENV_PY) -m traffic_intel_phase2.detect_track \
+		--source $(RTSP_URL) \
+		--model  $(PHASE2_MODEL) \
+		--tracker $(PHASE2_TRACKER) \
+		--events-out $(PHASE2_EVENTS) \
+		--video-out  $(PHASE2_VIDEO) \
+		--max-frames $$(( $(PHASE2_SECONDS) * 10 ))
+
 sandbox-down: stream-down annotation-down ## Stop all sandbox services
 
 sandbox-package: ## Tar data + docs into dist/sandbox-v1.tar.zst (needs zstd)
@@ -143,4 +160,5 @@ clean-all: clean ## Also remove raw videos (destructive)
         validate-metadata \
         annotation-up annotation-seed annotation-down \
         sandbox-up sandbox-verify sandbox-down sandbox-package viewer \
+        phase2-detect \
         clean-synth clean clean-all
