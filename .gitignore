@@ -41,3 +41,9 @@ build/
 # Docker volumes (if bind-mounted locally)
 pgdata/
 cvat_data/
+
+# Reject-pile (large regeneratable artifacts never to be tracked)
+data/_rejected/
+data/test_stab/
+data/raw/veo3/*.mp4
+data/raw/veo3/*.webm
