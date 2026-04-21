@@ -1,0 +1,25 @@
+<?xml version='1.0' encoding='utf-8'?>
+<additional>
+  <inductionLoop id="DET-N-1-1" lane="in_N_0" pos="-50.0" freq="60" file="NUL" />
+  <inductionLoop id="DET-N-2-1" lane="in_N_1" pos="-50.0" freq="60" file="NUL" />
+  <inductionLoop id="DET-N-3-1" lane="in_N_2" pos="-50.0" freq="60" file="NUL" />
+  <inductionLoop id="DET-N-4-1" lane="in_N_3" pos="-50.0" freq="60" file="NUL" />
+  <inductionLoop id="DET-N-5-1" lane="in_N_4" pos="-50.0" freq="60" file="NUL" />
+  <inductionLoop id="DET-N-2-2" lane="in_N_1" pos="-55.0" freq="60" file="NUL" />
+  <inductionLoop id="DET-S-1-1" lane="in_S_0" pos="-50.0" freq="60" file="NUL" />
+  <inductionLoop id="DET-S-2-1" lane="in_S_1" pos="-50.0" freq="60" file="NUL" />
+  <inductionLoop id="DET-S-3-1" lane="in_S_2" pos="-50.0" freq="60" file="NUL" />
+  <inductionLoop id="DET-S-4-1" lane="in_S_3" pos="-50.0" freq="60" file="NUL" />
+  <inductionLoop id="DET-S-5-1" lane="in_S_4" pos="-50.0" freq="60" file="NUL" />
+  <inductionLoop id="DET-S-2-2" lane="in_S_1" pos="-55.0" freq="60" file="NUL" />
+  <inductionLoop id="DET-E-1-1" lane="in_E_0" pos="-50.0" freq="60" file="NUL" />
+  <inductionLoop id="DET-E-2-1" lane="in_E_1" pos="-50.0" freq="60" file="NUL" />
+  <inductionLoop id="DET-E-3-1" lane="in_E_2" pos="-50.0" freq="60" file="NUL" />
+  <inductionLoop id="DET-E-4-1" lane="in_E_3" pos="-50.0" freq="60" file="NUL" />
+  <inductionLoop id="DET-E-2-2" lane="in_E_1" pos="-55.0" freq="60" file="NUL" />
+  <inductionLoop id="DET-W-1-1" lane="in_W_0" pos="-50.0" freq="60" file="NUL" />
+  <inductionLoop id="DET-W-2-1" lane="in_W_1" pos="-50.0" freq="60" file="NUL" />
+  <inductionLoop id="DET-W-3-1" lane="in_W_2" pos="-50.0" freq="60" file="NUL" />
+  <inductionLoop id="DET-W-4-1" lane="in_W_3" pos="-50.0" freq="60" file="NUL" />
+  <inductionLoop id="DET-W-2-2" lane="in_W_1" pos="-55.0" freq="60" file="NUL" />
+</additional>

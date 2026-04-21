@@ -45,6 +45,11 @@ class _MjpegBroadcaster:
     producers, they just see dropped frames.
     """
 
+    # Snapshot sink — Chromium in this VM SIGILLs on multipart/x-mixed-replace,
+    # so the viewer polls this file over plain HTTP instead of the MJPEG stream.
+    _LATEST_SNAPSHOT = Path("/tmp/traffic-intel-phase2-latest.jpg")
+    _SNAPSHOT_EVERY = 3  # write ~every Nth frame to limit disk I/O
+
     def __init__(self, port: int, jpeg_quality: int = 72) -> None:
         self.port = port
         self._jpeg_quality = jpeg_quality
@@ -52,15 +57,30 @@ class _MjpegBroadcaster:
         self._latest_jpeg: bytes | None = None
         self._stop = threading.Event()
         self._server: ThreadingHTTPServer | None = None
+        self._snapshot_ctr = 0
+
+    @classmethod
+    def _write_latest(cls, jpeg_bytes: bytes) -> None:
+        try:
+            tmp = cls._LATEST_SNAPSHOT.with_suffix(".tmp.jpg")
+            tmp.write_bytes(jpeg_bytes)
+            tmp.replace(cls._LATEST_SNAPSHOT)
+        except Exception:
+            pass
 
     def update(self, bgr_frame: np.ndarray) -> None:
         ok, buf = cv2.imencode(".jpg", bgr_frame,
                                [int(cv2.IMWRITE_JPEG_QUALITY), self._jpeg_quality])
         if not ok:
             return
+        jpeg_bytes = buf.tobytes()
         with self._cv:
-            self._latest_jpeg = buf.tobytes()
+            self._latest_jpeg = jpeg_bytes
             self._cv.notify_all()
+        # Atomic snapshot sink (every Nth frame) — consumed by the dashboard.
+        self._snapshot_ctr = (self._snapshot_ctr + 1) % self._SNAPSHOT_EVERY
+        if self._snapshot_ctr == 0:
+            self._write_latest(jpeg_bytes)
 
     def _wait_for_frame(self, timeout: float = 5.0) -> bytes | None:
         with self._cv:
@@ -176,11 +196,15 @@ def run(
     device: str | None = None,
     show_overlay: bool = False,
     mjpeg_port: int | None = None,
+    half: bool | None = None,
 ) -> dict:
     """Run detect + track. Returns a summary dict."""
 
     device = device or _select_device()
-    print(f"[phase2] loading {model_name} on device={device}", file=sys.stderr)
+    # FP16 auto-enables on GPU (2–3× throughput, minimal accuracy cost); off on CPU.
+    if half is None:
+        half = device != "cpu"
+    print(f"[phase2] loading {model_name} on device={device} half={half}", file=sys.stderr)
     model = YOLO(model_name)
 
     # Build overlay annotators up front (supervision)
@@ -244,6 +268,7 @@ def run(
             iou=iou,
             imgsz=imgsz,
             device=device,
+            half=half,
             persist=True,
             stream=True,
             verbose=False,
@@ -411,6 +436,10 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--max-frames", type=int, default=None,
                    help="Stop after N frames (useful for benchmarking)")
     p.add_argument("--device", default=None, help="'0' (GPU), 'cpu', or None (auto)")
+    p.add_argument("--half", dest="half", action="store_true", default=None,
+                   help="Force FP16 inference (default: auto — on for GPU, off for CPU)")
+    p.add_argument("--no-half", dest="half", action="store_false",
+                   help="Disable FP16 even on GPU")
     p.add_argument("--show", action="store_true", help="Show annotated window (requires GUI)")
     p.add_argument("--mjpeg-port", type=int, default=None,
                    help="Also serve annotated frames as MJPEG on http://127.0.0.1:<port>/stream.mjpeg")
@@ -430,6 +459,7 @@ def main(argv: list[str] | None = None) -> int:
         device=args.device,
         show_overlay=args.show,
         mjpeg_port=args.mjpeg_port,
+        half=args.half,
     )
     return 0
 

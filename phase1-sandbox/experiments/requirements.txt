@@ -1,0 +1,24 @@
+# Optional dependencies for the sim-to-real research prototypes.
+# Install *in addition to* the base sandbox venv (pip install -e '.[dev]').
+# Each line is optional — the scripts degrade gracefully if a library is absent.
+
+# ─── Segmentation (stage 02) ────────────────────────────────────────────────
+# Primary: Grounded-SAM 2 — install from source, see scripts README.
+# Secondary: Ultralytics YOLO-seg (AGPL-3.0 — internal eval only)
+ultralytics>=8.3.0
+
+# Background inpainting
+simple-lama-inpainting>=0.1.2
+
+# ─── Traffic simulation (stage 03) ──────────────────────────────────────────
+# Python bindings for SUMO. Also `apt install sumo sumo-tools` for the binary.
+eclipse-sumo>=1.20.0
+traci>=1.20.0
+sumolib>=1.20.0
+
+# ─── Diffusion polish (stage 04, optional, GPU) ─────────────────────────────
+# Only needed if you want CogVideoX-5B-I2V post-processing.
+diffusers>=0.31.0
+accelerate>=0.34.0
+transformers>=4.45.0
+# huggingface-cli download THUDM/CogVideoX-5b-I2V

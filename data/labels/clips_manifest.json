@@ -106,7 +106,7 @@
       "classifier_version": "v1.0-rules",
       "pass_used": "B",
       "reasons": [
-        "4 tracks stationary outside queue zones"
+        "5 tracks stationary outside queue zones"
       ]
     },
     {
@@ -141,6 +141,16 @@
       "pass_used": "A",
       "reasons": [
         "track churn 60/32=1.88 >= 1.8"
+      ]
+    },
+    {
+      "clip": "site1_accident_real_01",
+      "predicted_tag": "insufficient_evidence",
+      "predicted_confidence": 0.0,
+      "classifier_version": "v1.0-rules",
+      "pass_used": "B",
+      "reasons": [
+        "Pass B sampled motion did not trigger any rule"
       ]
     }
   ],

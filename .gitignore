@@ -50,3 +50,23 @@ data/raw/veo3/*.webm
 data/events/
 data/annotated/
 .venv.partial-cpu/
+
+# SUMO build artifacts (regeneratable via `make sumo-scenario`)
+phase1-sandbox/experiments/sumo/site1/build/osm_bbox.osm.xml
+phase1-sandbox/experiments/sumo/site1/build/net.net.xml
+phase1-sandbox/experiments/sumo/site1/synth/sim.log
+phase1-sandbox/experiments/sumo/site1/synth/stats.xml
+phase1-sandbox/experiments/sumo/site1/synth/tripinfo.xml
+data/research/sumo/*.parquet
+data/research/sumo/*.ndjson
+data/research/composed/
+
+# Large / non-reproducible local artifacts (keep out of GitHub)
+*.pt
+.playwright-mcp/
+data/_sigill_backup_*/
+data/forecast/
+data/metadata/backups/
+data/normalized/scenarios/
+data/raw/scenarios/
+data/research/

@@ -179,6 +179,163 @@ sandbox-package: ## Tar data + docs into dist/sandbox-v1.tar.zst (needs zstd)
 		data/detector_counts data/signal_logs data/metadata \
 		phase1-sandbox/data_dictionary.md phase1-sandbox/methodology.md
 
+# ─── Research: sim-to-real prototypes (phase1-sandbox/experiments) ──────────
+RESEARCH_DIR      ?= data/research
+RESEARCH_VIDEO    ?= $(RAW_VIDEO_DIR)/amman-wadi-saqra-tour.mp4
+RESEARCH_DATE     ?= $(shell date -u +%Y-%m-%d)
+RESEARCH_SEED     ?= 42
+RESEARCH_SECONDS  ?= 30
+RESEARCH_PER_CLASS ?= 10
+RESEARCH_EVENT_SECONDS ?= 15
+EXPERIMENTS       := phase1-sandbox/experiments
+
+research-frames: setup ## Stage 01: extract high-quality keyframes from Wadi Saqra video
+	$(VENV_PY) $(EXPERIMENTS)/01_extract_wadisaqra_frames.py \
+		--video $(RESEARCH_VIDEO) \
+		--out-dir $(RESEARCH_DIR)/frames \
+		--seed $(RESEARCH_SEED)
+
+research-segment: setup ## Stage 02: segment vehicles + build clean background plate
+	$(VENV_PY) $(EXPERIMENTS)/02_segment_and_inpaint.py \
+		--frames-dir $(RESEARCH_DIR)/frames \
+		--out-segments $(RESEARCH_DIR)/segments \
+		--out-crops    $(RESEARCH_DIR)/crops \
+		--out-plates   $(RESEARCH_DIR)/plates \
+		--backend auto
+
+research-sumo: setup ## Stage 03: coupled counts + signals + trajectories (real SUMO by default)
+	$(VENV_PY) $(EXPERIMENTS)/03_sumo_scenario.py \
+		--profiles $(PROFILES_YAML) \
+		--phase-plan $(PHASE_PLAN_YAML) \
+		--site-meta $(SITE_METADATA) \
+		--out-dir $(RESEARCH_DIR)/sumo \
+		--date $(RESEARCH_DATE) \
+		--seed $(RESEARCH_SEED)
+
+# ─── SUMO scenario rebuild (regenerate from site1.json / phase_plan / events)
+SUMO_SITE_DIR    := $(EXPERIMENTS)/sumo/site1
+PHASE2_EVENTS    ?= data/events/phase2.ndjson
+
+sumo-build: setup ## Rebuild the SUMO 4-way network from site1.example.json
+	$(VENV_PY) $(SUMO_SITE_DIR)/build_site1_network.py \
+		--site-meta $(SITE_METADATA) \
+		--out-dir $(SUMO_SITE_DIR)/synth
+
+sumo-tllogic: setup ## Regenerate tl.add.xml from phase_plan.yml
+	$(VENV_PY) $(SUMO_SITE_DIR)/build_site1_tllogic.py \
+		--phase-plan $(PHASE_PLAN_YAML) \
+		--net  $(SUMO_SITE_DIR)/synth/net.net.xml \
+		--out  $(SUMO_SITE_DIR)/synth/tl.add.xml
+
+sumo-routes: setup ## Regenerate routes.rou.xml from Phase 2 stop_line_crossing events
+	$(VENV_PY) $(SUMO_SITE_DIR)/build_site1_routes.py \
+		--events     $(PHASE2_EVENTS) \
+		--site-meta  $(SITE_METADATA) \
+		--out        $(SUMO_SITE_DIR)/synth/routes.rou.xml
+
+sumo-detectors: setup ## Regenerate detectors.add.xml (22 induction loops)
+	$(VENV_PY) $(SUMO_SITE_DIR)/build_site1_detectors.py \
+		--profiles $(PROFILES_YAML) \
+		--out      $(SUMO_SITE_DIR)/synth/detectors.add.xml
+
+sumo-scenario: sumo-build sumo-tllogic sumo-routes sumo-detectors ## Rebuild every SUMO input in one shot
+
+# ─── Google Maps Routes API — live + typical traffic ────────────────────────
+GMAPS_ROUTES_YAML ?= phase1-sandbox/configs/gmaps_routes.yml
+GMAPS_DATE        ?= $(shell .venv/bin/python -c "from datetime import date, timedelta; t=date.today(); d=((6-t.weekday())%7) or 7; print((t+timedelta(days=d)).isoformat())")
+GMAPS_INTERVAL_MIN ?= 30
+GMAPS_POLL_S      ?= 300
+GMAPS_TYPICAL_OUT ?= data/research/gmaps/typical_$(GMAPS_DATE).ndjson
+GMAPS_LIVE_OUT    ?= data/events/gmaps_traffic.ndjson
+
+gmaps-once: ## Single live call for every corridor (smoke test the API key)
+	$(VENV_PY) -m traffic_intel_sandbox.ingest.gmaps poll \
+		--config $(GMAPS_ROUTES_YAML) --out $(GMAPS_LIVE_OUT) --once
+
+gmaps-typical: ## One-shot fetch of Google's typical traffic for next Sunday (192 calls ≈ $2)
+	$(VENV_PY) -m traffic_intel_sandbox.ingest.gmaps typical \
+		--config $(GMAPS_ROUTES_YAML) \
+		--date $(GMAPS_DATE) \
+		--interval-min $(GMAPS_INTERVAL_MIN) \
+		--out $(GMAPS_TYPICAL_OUT)
+
+gmaps-up: ## Start the live polling daemon in the background
+	@if [ -f /tmp/traffic-intel-gmaps.pid ] && kill -0 $$(cat /tmp/traffic-intel-gmaps.pid) 2>/dev/null; then \
+	    echo "already running (pid $$(cat /tmp/traffic-intel-gmaps.pid))"; exit 0; fi
+	@mkdir -p $(dir $(GMAPS_LIVE_OUT))
+	@nohup $(VENV_PY) -m traffic_intel_sandbox.ingest.gmaps poll \
+		--config $(GMAPS_ROUTES_YAML) --out $(GMAPS_LIVE_OUT) \
+		--interval-s $(GMAPS_POLL_S) \
+		> /tmp/traffic-intel-gmaps.log 2>&1 & echo $$! > /tmp/traffic-intel-gmaps.pid
+	@sleep 1 && echo "gmaps-poll pid $$(cat /tmp/traffic-intel-gmaps.pid)  log=/tmp/traffic-intel-gmaps.log"
+
+gmaps-down: ## Stop the live polling daemon
+	@if [ -f /tmp/traffic-intel-gmaps.pid ] && kill -0 $$(cat /tmp/traffic-intel-gmaps.pid) 2>/dev/null; then \
+	    kill $$(cat /tmp/traffic-intel-gmaps.pid) && echo "stopped"; else echo "not running"; fi
+	@rm -f /tmp/traffic-intel-gmaps.pid
+
+# ─── Forecasting — anchor video + Google profile → day prediction ───────────
+FORECAST_VIDEO       ?= data/raw/youtube/anchor.mp4
+FORECAST_VIDEO_URL   ?= https://www.youtube.com/watch?v=52ao3WsInBo
+FORECAST_T0          ?= 13:00
+FORECAST_SITE        ?= data/forecast/forecast_site.json
+FORECAST_EVENTS      ?= data/forecast/anchor_events.ndjson
+FORECAST_TYPICAL     ?= data/research/gmaps/typical_$(GMAPS_DATE).parquet
+FORECAST_MAX_FRAMES  ?= 900
+FORECAST_DAY_JSON    ?= data/forecast/forecast_day.json
+
+forecast-download: ## Fetch the anchor YouTube video
+	@mkdir -p $(dir $(FORECAST_VIDEO))
+	$(VENV)/bin/yt-dlp -f "bv*[height<=1080][ext=mp4]+ba/best[height<=1080]" \
+	    -o "$(dir $(FORECAST_VIDEO))anchor.%(ext)s" \
+	    --merge-output-format mp4 "$(FORECAST_VIDEO_URL)"
+
+forecast-calibrate: ## Extract keyframe + default stop-lines for the anchor video
+	$(VENV_PY) -m traffic_intel_sandbox.forecast.calibrate \
+	    --video $(FORECAST_VIDEO) --out-dir data/forecast
+
+forecast-observe: ## Run YOLO26 on the anchor video; write anchor_events.ndjson
+	$(VENV_PY) -m traffic_intel_phase2.detect_track \
+	    --source $(FORECAST_VIDEO) \
+	    --model yolo26n.pt --tracker botsort.yaml \
+	    --metadata $(FORECAST_SITE) \
+	    --events-out $(FORECAST_EVENTS) \
+	    --video-out data/forecast/anchor_annotated.mp4 \
+	    --max-frames $(FORECAST_MAX_FRAMES)
+
+forecast-predict: ## Full-day prediction; pass T=HH:MM for single-slot print
+	$(VENV_PY) -m traffic_intel_sandbox.forecast.predict \
+	    --anchor-events $(FORECAST_EVENTS) \
+	    --typical       $(FORECAST_TYPICAL) \
+	    --t0            $(FORECAST_T0) \
+	    --out           $(FORECAST_DAY_JSON) \
+	    $(if $(T),--at $(T))
+
+forecast-all: forecast-download forecast-calibrate forecast-observe forecast-predict ## End-to-end anchor → forecast
+
+research-compose: setup ## Stage 04: composite labeled synthetic video
+	$(VENV_PY) $(EXPERIMENTS)/04_compose_synthetic_video.py \
+		--plate $(RESEARCH_DIR)/plates/wadisaqra_plate.jpg \
+		--crops-dir $(RESEARCH_DIR)/crops \
+		--trajectories $(RESEARCH_DIR)/sumo/trajectories_$(RESEARCH_DATE).parquet \
+		--site-meta $(SITE_METADATA) \
+		--out-video $(RESEARCH_DIR)/composed/video.mp4 \
+		--out-labels $(RESEARCH_DIR)/composed/labels.json \
+		--seconds $(RESEARCH_SECONDS) \
+		--seed $(RESEARCH_SEED)
+
+research-events: setup ## Stage 05: seeded §6.6 event clips (stalled, spillback, …)
+	$(VENV_PY) $(EXPERIMENTS)/05_generate_event_clips.py \
+		--out-root $(RESEARCH_DIR)/events \
+		--plate $(RESEARCH_DIR)/plates/wadisaqra_plate.jpg \
+		--crops-dir $(RESEARCH_DIR)/crops \
+		--site-meta $(SITE_METADATA) \
+		--per-class $(RESEARCH_PER_CLASS) \
+		--seconds $(RESEARCH_EVENT_SECONDS) \
+		--seed $(RESEARCH_SEED)
+
+research-all: research-frames research-segment research-sumo research-compose research-events ## Run the full sim-to-real pipeline end-to-end
+
 # ─── Cleaning ────────────────────────────────────────────────────────────────
 clean-synth: ## Remove synthetic artifacts (keeps raw videos)
 	rm -rf $(COUNTS_DIR)/*.parquet $(SIGNALS_DIR)/*.ndjson
@@ -197,4 +354,5 @@ clean-all: clean ## Also remove raw videos (destructive)
         annotation-up annotation-seed annotation-down \
         sandbox-up sandbox-verify sandbox-down sandbox-package viewer \
         phase2-detect phase2-live phase2-live-bg phase2-live-down phase2-classify \
+        research-frames research-segment research-sumo research-compose research-events research-all \
         clean-synth clean clean-all

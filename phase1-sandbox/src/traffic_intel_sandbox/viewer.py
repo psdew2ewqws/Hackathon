@@ -42,952 +42,1119 @@ HTML = r"""<!doctype html>
 <html lang="en" dir="ltr"><head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=1280">
-<title>Traffic &amp; Ops Briefing · SITE-001</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@300;400;500;700&display=swap" rel="stylesheet">
+<title>Traffic Ops · SITE-001</title>
 <style>
   :root {
     color-scheme: dark;
-    --paper:    #0E0F0C;
-    --paper-2:  #15160F;
-    --ink:      #F0E8D8;
-    --ink-dim:  #8A8777;
-    --rule:     #2A2B26;
-    --tungsten: #FF6A00;
-    --phosphor: #9FE870;
-    --amber:    #F1C40F;
-    --stop:     #FF3D3D;
-    --serif:    'Instrument Serif', 'Cormorant Garamond', Georgia, serif;
-    --mono:     'JetBrains Mono', ui-monospace, 'SF Mono', monospace;
+    /* ── Surface ─────────────────────────────── */
+    --bg:         #0B0D11;
+    --surface:    #14171D;
+    --surface-2:  #181C24;
+    --hover:      #1B1F28;
+    --border:     #23272F;
+    --border-soft:#1A1D23;
+    /* ── Text ───────────────────────────────── */
+    --fg:         #E7E9EC;
+    --fg-dim:     #9097A0;
+    --fg-faint:   #5A616B;
+    --fg-mute:    #3E444D;
+    /* ── Accent (use sparingly) ─────────────── */
+    --accent:     #E8B464;   /* warm amber — live / active only */
+    --accent-dim: #8B6A3A;
+    --accent-ghost:rgba(232,180,100,0.10);
+    --good:       #7FA889;   /* sage, for positive deltas */
+    --warn:       #D68F6B;   /* muted terracotta, rarely */
+    /* ── Type ───────────────────────────────── */
+    --sans: system-ui, -apple-system, 'Segoe UI', 'Helvetica Neue', 'DejaVu Sans', 'Ubuntu', sans-serif;
+    --mono: ui-monospace, 'JetBrains Mono', 'Fira Mono', 'DejaVu Sans Mono', 'Ubuntu Mono', monospace;
+    /* ── Rhythm ────────────────────────────── */
+    --r-sm: 6px;
+    --r-md: 10px;
+    --r-lg: 14px;
   }
-  *, *::before, *::after { box-sizing: border-box; }
-  html, body { margin: 0; padding: 0; }
+  *,*::before,*::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; background: var(--bg); color: var(--fg); }
   body {
-    font-family: var(--mono);
-    font-size: 13px; line-height: 1.5;
-    color: var(--ink);
-    background:
-      radial-gradient(ellipse 1400px 700px at 50% -20%, rgba(255,106,0,0.07), transparent 70%),
-      radial-gradient(ellipse 900px 500px at 100% 100%, rgba(159,232,112,0.04), transparent 70%),
-      linear-gradient(#0E0F0C, #0A0B08);
-    background-attachment: fixed;
+    font-family: var(--sans);
+    font-size: 13px; line-height: 1.55;
+    font-feature-settings: 'cv11' 1, 'ss01' 1, 'tnum' 1;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
     min-height: 100vh;
-    font-feature-settings: 'tnum' 1, 'zero' 1, 'ss01' 1;
-    overflow-x: hidden;
   }
-  /* Film-grain overlay */
+  ::selection { background: var(--accent-ghost); color: var(--fg); }
+
+  /* ── Subtle atmospheric warm glow only at very top, one line deep ── */
   body::before {
-    content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 1;
-    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 120'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='2.3' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.94  0 0 0 0 0.91  0 0 0 0 0.85  0 0 0 0.08 0'/></filter><rect width='120' height='120' filter='url(%23n)'/></svg>");
-    opacity: 0.4; mix-blend-mode: overlay;
-  }
-  /* Thin vertical printers' rule */
-  body::after {
-    content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 0;
-    background-image: linear-gradient(to right, rgba(42,43,38,0.55) 1px, transparent 1px);
-    background-size: 120px 120px; opacity: 0.6;
+    content: ""; position: fixed; inset: 0 0 auto 0; height: 320px;
+    background: radial-gradient(ellipse 900px 320px at 50% 0%, rgba(232,180,100,0.025), transparent 70%);
+    pointer-events: none; z-index: 0;
   }
 
   .page {
-    position: relative; z-index: 2;
+    position: relative; z-index: 1;
     max-width: 1480px; margin: 0 auto;
-    padding: 32px 44px 64px;
+    padding: 28px 32px 56px;
   }
 
-  /* registration marks */
-  .reg { position: fixed; width: 24px; height: 24px; pointer-events: none; z-index: 3;
-         color: var(--ink-dim); opacity: 0.45; }
-  .reg.tl { top: 18px; left: 18px; }
-  .reg.tr { top: 18px; right: 18px; transform: scaleX(-1); }
-  .reg.bl { bottom: 18px; left: 18px; transform: scaleY(-1); }
-  .reg.br { bottom: 18px; right: 18px; transform: scale(-1,-1); }
+  /* ── HEADER ─────────────────────────────────── */
+  .topbar {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    gap: 28px;
+    padding: 6px 0 24px;
+    margin-bottom: 28px;
+    border-bottom: 1px solid var(--border-soft);
+  }
+  .brand {
+    display: flex; align-items: baseline; gap: 12px;
+  }
+  .brand .logo {
+    width: 22px; height: 22px; position: relative;
+  }
+  .brand .logo::before, .brand .logo::after {
+    content: ""; position: absolute; background: var(--accent);
+    border-radius: 2px;
+  }
+  .brand .logo::before { inset: 0 auto auto 0; width: 22px; height: 6px; }
+  .brand .logo::after  { inset: 9px 0 9px auto; width: 6px; height: 4px; background: var(--fg-dim); }
+  .brand h1 {
+    font-weight: 600; font-size: 15px; letter-spacing: -0.01em;
+    color: var(--fg);
+  }
+  .brand h1 .sep { color: var(--fg-mute); margin: 0 8px; font-weight: 400; }
+  .brand h1 .site { color: var(--fg-dim); font-weight: 400; }
 
-  /* ── MASTHEAD ─────────────────────────────── */
-  .masthead {
-    display: grid; grid-template-columns: 1fr auto 1fr;
-    align-items: baseline; gap: 32px;
-    padding-bottom: 16px; border-bottom: 2px solid var(--ink);
+  .compliance {
+    display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
+    justify-content: center;
   }
-  .masthead-side {
-    font-size: 10px; letter-spacing: 0.22em; text-transform: uppercase;
-    color: var(--ink-dim); display: flex; gap: 22px;
+  .chip {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 5px 10px;
+    font: 500 11px var(--mono);
+    letter-spacing: 0.02em;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    color: var(--fg-dim);
+    transition: color 0.2s, border-color 0.2s, background 0.2s;
   }
-  .masthead-side.right { justify-content: flex-end; }
-  .masthead-title {
-    font-family: var(--serif); font-weight: 400;
-    font-size: 74px; line-height: 0.88;
-    letter-spacing: -0.025em; text-align: center;
-    font-style: italic;
+  .chip .dot {
+    width: 5px; height: 5px; border-radius: 50%;
+    background: var(--fg-mute);
+    transition: background 0.2s, box-shadow 0.2s;
   }
-  .masthead-title .roman { font-style: normal; }
-  .masthead-title .amp { color: var(--tungsten); font-style: normal; }
+  .chip.ok { color: var(--fg); border-color: rgba(232,180,100,0.3); }
+  .chip.ok .dot { background: var(--accent); box-shadow: 0 0 4px rgba(232,180,100,0.6); }
+  .chip.bad { color: var(--fg-faint); }
 
-  .masthead-sub {
-    padding: 10px 0 12px; border-bottom: 1px solid var(--rule);
-    display: grid; grid-template-columns: repeat(4, 1fr); gap: 24px;
-    font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase;
-    color: var(--ink-dim); margin-bottom: 30px;
+  .meta-right {
+    display: flex; align-items: center; gap: 20px;
+    font: 500 12px var(--mono); color: var(--fg-dim);
   }
-  .masthead-sub b {
-    color: var(--ink); font-weight: 500;
-    letter-spacing: 0.04em; text-transform: none;
-    font-size: 12px;
+  .meta-right time { color: var(--fg); font-variant-numeric: tabular-nums; }
+  .live-pill {
+    display: inline-flex; align-items: center; gap: 7px;
+    padding: 5px 11px; border-radius: 999px;
+    background: var(--accent-ghost);
+    border: 1px solid rgba(232,180,100,0.25);
+    color: var(--accent); font: 600 11px var(--mono);
+    letter-spacing: 0.08em;
   }
-  .badge-onair {
-    color: var(--tungsten); display: inline-flex; align-items: center;
-    gap: 8px; font-size: 11px; letter-spacing: 0.2em;
+  .live-pill .pulse {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 0 0 rgba(232,180,100, 0.8);
+    animation: livepulse 1.8s ease-out infinite;
   }
-  .badge-onair .dot {
-    width: 9px; height: 9px; border-radius: 50%;
-    background: var(--tungsten); box-shadow: 0 0 12px var(--tungsten);
-    animation: blink 1.8s ease-in-out infinite;
+  @keyframes livepulse {
+    0%   { box-shadow: 0 0 0 0 rgba(232,180,100, 0.6); }
+    70%  { box-shadow: 0 0 0 7px rgba(232,180,100, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(232,180,100, 0); }
   }
-  @keyframes blink { 50% { opacity: 0.25; transform: scale(0.82); } }
+  .live-pill.off { background: transparent; border-color: var(--border); color: var(--fg-faint); }
+  .live-pill.off .pulse { background: var(--fg-mute); box-shadow: none; animation: none; }
 
-  /* ── HERO METRICS ─────────────────────────── */
-  .hero {
+  /* ── PANEL BASE ─────────────────────────────── */
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r-md);
+    padding: 20px 22px;
+  }
+  .panel-title {
+    display: flex; justify-content: space-between; align-items: baseline;
+    margin-bottom: 18px;
+  }
+  .panel-title h2 {
+    font-weight: 500; font-size: 13px; color: var(--fg);
+    letter-spacing: -0.005em;
+  }
+  .panel-title .hint {
+    font: 500 11px var(--mono);
+    color: var(--fg-faint); letter-spacing: 0.02em;
+  }
+
+  /* ── HERO METRICS ──────────────────────────── */
+  .metrics {
     display: grid; grid-template-columns: repeat(5, 1fr);
-    border-top: 1px solid var(--rule); border-bottom: 1px solid var(--rule);
-    margin-bottom: 34px;
+    gap: 0;
+    margin-bottom: 24px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r-md);
+    overflow: hidden;
   }
-  .stat {
-    padding: 20px 24px; position: relative;
-    border-right: 1px solid var(--rule);
-  }
-  .stat:last-child { border-right: none; }
-  .stat .label {
-    font-size: 9px; letter-spacing: 0.26em;
-    text-transform: uppercase; color: var(--ink-dim);
-    display: flex; gap: 8px; align-items: center;
-  }
-  .stat .label::before {
-    content: ''; width: 5px; height: 5px; background: var(--tungsten); border-radius: 50%;
-  }
-  .stat .value {
-    font-family: var(--serif); font-size: 64px; line-height: 1;
-    font-weight: 400; margin-top: 10px;
-    letter-spacing: -0.025em; color: var(--ink);
-    font-variant-numeric: tabular-nums lining-nums;
-  }
-  .stat.accent .value { color: var(--tungsten); }
-  .stat.phosphor .value { color: var(--phosphor); }
-  .stat .unit {
-    font-size: 10px; color: var(--ink-dim);
-    letter-spacing: 0.15em; text-transform: uppercase; margin-top: 6px;
-  }
-
-  /* ── FIGURE CARDS ─────────────────────────── */
-  .grid {
-    display: grid; grid-template-columns: 1.6fr 1fr;
-    gap: 30px; margin-bottom: 34px;
-  }
-  .figure {
-    border: 1px solid var(--rule);
-    background: linear-gradient(180deg, rgba(21,22,15,0.85), rgba(14,15,12,0.55));
+  .metric {
+    padding: 20px 22px;
+    border-right: 1px solid var(--border-soft);
     position: relative;
   }
-  .figure-head {
-    display: flex; justify-content: space-between; align-items: baseline;
-    padding: 14px 18px; gap: 20px;
-    border-bottom: 1px solid var(--rule);
-    background: var(--paper-2);
+  .metric:last-child { border-right: none; }
+  .metric .label {
+    font: 500 10px var(--mono);
+    letter-spacing: 0.12em; text-transform: uppercase;
+    color: var(--fg-faint);
+    margin-bottom: 10px;
   }
-  .fig-id {
-    font-size: 9px; letter-spacing: 0.26em;
-    text-transform: uppercase; color: var(--tungsten);
-    white-space: nowrap;
+  .metric .value {
+    font-weight: 600; font-size: 28px; line-height: 1.1;
+    color: var(--fg); letter-spacing: -0.02em;
+    font-variant-numeric: tabular-nums lining-nums;
   }
-  .fig-title {
-    font-family: var(--serif); font-style: italic;
-    font-size: 18px; color: var(--ink);
-    flex: 1; text-align: center;
+  .metric .sub {
+    font: 400 11px var(--mono);
+    color: var(--fg-dim); margin-top: 6px;
+    letter-spacing: 0.01em;
   }
-  .fig-meta {
-    font-size: 10px; letter-spacing: 0.14em;
-    color: var(--ink-dim); text-transform: uppercase;
-    white-space: nowrap;
-  }
+  .metric.accent .value { color: var(--accent); }
+  .metric.accent .label { color: var(--accent-dim); }
 
-  /* ── STREAM DUAL ─────────────────────────── */
-  .dual {
-    display: grid; grid-template-columns: 1fr 1fr; gap: 1px;
-    background: var(--rule);
+  /* ── FEED (mini strip + main stage) ────────── */
+  .feed {
+    margin-bottom: 24px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r-md);
+    overflow: hidden;
   }
-  .stream-frame {
-    position: relative; background: #000;
-    aspect-ratio: 16/9; overflow: hidden;
+  .mini-strip {
+    display: grid; grid-template-columns: repeat(5, 1fr); gap: 1px;
+    background: var(--border-soft);
+    padding: 1px;
   }
-  .stream-frame img {
+  .mini {
+    all: unset; cursor: pointer;
+    position: relative; display: block;
+    aspect-ratio: 16 / 9;
+    background: #000;
+    overflow: hidden;
+    transition: filter 0.25s ease;
+  }
+  .mini:hover .mini-media { filter: saturate(1); }
+  .mini[aria-pressed="true"]::after {
+    content: ""; position: absolute; inset: 0;
+    box-shadow: inset 0 0 0 2px var(--accent);
+    pointer-events: none;
+  }
+  .mini-media {
+    width: 100%; height: 100%;
+    object-fit: cover; display: block;
+    filter: saturate(0.6) brightness(0.85);
+    transition: filter 0.25s ease;
+  }
+  .mini[aria-pressed="true"] .mini-media { filter: none; }
+  .mini-label {
+    position: absolute; left: 10px; bottom: 10px; z-index: 2;
+    padding: 3px 8px; border-radius: var(--r-sm);
+    font: 600 10px var(--mono);
+    letter-spacing: 0.04em;
+    color: var(--fg);
+    background: rgba(11,13,17,0.78);
+    backdrop-filter: blur(6px);
+    display: inline-flex; align-items: center; gap: 6px;
+  }
+  .mini[aria-pressed="true"] .mini-label { color: var(--accent); }
+  .mini-live-dot {
+    width: 5px; height: 5px; border-radius: 50%;
+    background: var(--accent);
+    animation: minidot 1.6s ease-in-out infinite;
+  }
+  @keyframes minidot { 50% { opacity: 0.35; } }
+
+  .stage {
+    position: relative;
+    aspect-ratio: 16 / 9; width: 100%;
+    background: #000;
+  }
+  .stage-media {
     width: 100%; height: 100%; object-fit: contain; display: block;
+    background: #000;
   }
-  .stream-frame::after {
-    content: ""; position: absolute; inset: 0; pointer-events: none;
-    background-image: repeating-linear-gradient(
-      0deg, rgba(0,0,0,0.13) 0px, rgba(0,0,0,0.13) 1px, transparent 1px, transparent 3px);
-    mix-blend-mode: multiply;
-  }
-  .stream-frame::before {
-    content: ""; position: absolute; inset: 12px; pointer-events: none;
-    background:
-      linear-gradient(var(--ink), var(--ink)) top    left  / 18px 1.5px no-repeat,
-      linear-gradient(var(--ink), var(--ink)) top    left  / 1.5px 18px no-repeat,
-      linear-gradient(var(--ink), var(--ink)) top    right / 18px 1.5px no-repeat,
-      linear-gradient(var(--ink), var(--ink)) top    right / 1.5px 18px no-repeat,
-      linear-gradient(var(--ink), var(--ink)) bottom left  / 18px 1.5px no-repeat,
-      linear-gradient(var(--ink), var(--ink)) bottom left  / 1.5px 18px no-repeat,
-      linear-gradient(var(--ink), var(--ink)) bottom right / 18px 1.5px no-repeat,
-      linear-gradient(var(--ink), var(--ink)) bottom right / 1.5px 18px no-repeat;
-    opacity: 0.9; z-index: 2;
-  }
-  .stream-badge {
-    position: absolute; top: 22px; right: 22px; z-index: 3;
-    padding: 5px 10px;
-    background: rgba(14,15,12,0.78); border: 1px solid var(--ink);
-    font-size: 10px; letter-spacing: 0.22em; color: var(--ink);
-    display: flex; align-items: center; gap: 7px;
-  }
-  .stream-badge .rec {
-    width: 7px; height: 7px; border-radius: 50%;
-    background: var(--stop); box-shadow: 0 0 9px var(--stop);
-    animation: blink 1.3s ease-in-out infinite;
-  }
-  .stream-badge.ai .rec { background: var(--phosphor); box-shadow: 0 0 9px var(--phosphor); }
-  .p2-hint {
-    display: none; position: absolute; inset: 0; z-index: 4;
-    color: var(--ink); font-size: 11px;
-    padding: 20px; background: var(--paper);
-    text-align: center; align-items: center; justify-content: center;
-    flex-direction: column; gap: 10px;
-  }
-  .p2-hint code {
-    color: var(--phosphor); font-size: 12px;
-    padding: 4px 8px; border: 1px solid var(--rule);
-  }
-  .stream-note {
-    padding: 10px 18px; border-top: 1px solid var(--rule);
-    font-size: 10px; letter-spacing: 0.14em;
-    display: flex; justify-content: space-between; gap: 16px;
-    color: var(--ink-dim); text-transform: uppercase;
-  }
-  .stream-note a { color: var(--ink); text-decoration: none;
-                   border-bottom: 1px dotted var(--ink-dim); }
-  .stream-note a:hover { color: var(--tungsten); border-bottom-color: var(--tungsten); }
+  .stage video { pointer-events: none; }
+  .stage video::-webkit-media-controls,
+  .stage video::-webkit-media-controls-enclosure,
+  .stage video::-webkit-media-controls-panel { display: none !important; }
 
-  /* ── PHASE CLOCK ──────────────────────────── */
-  .clock-wrap { display: flex; justify-content: center; padding: 24px 18px 10px; }
-  .phase-clock { width: 260px; height: 260px; position: relative; }
-  .phase-clock svg { width: 100%; height: 100%; transform: rotate(-90deg); overflow: visible; }
-  .phase-clock .ring-bg { fill: none; stroke: var(--rule); stroke-width: 28; }
-  .phase-clock .ring-seg { fill: none; stroke-width: 28;
-                           transition: stroke 0.28s ease, filter 0.28s ease;
-                           stroke-linecap: butt; }
-  .phase-clock .center-text {
-    position: absolute; inset: 0;
-    display: flex; flex-direction: column; justify-content: center; align-items: center;
+  .stage-chrome {
+    position: absolute; inset: 14px 14px auto 14px;
+    display: flex; justify-content: space-between; align-items: center;
+    pointer-events: none; z-index: 2;
   }
-  .phase-clock .phase-num {
-    font-family: var(--serif); font-style: italic;
-    font-size: 84px; line-height: 1; color: var(--ink);
-    font-variant-numeric: tabular-nums;
+  .stage-tag, .stage-meta {
+    padding: 5px 10px; border-radius: var(--r-sm);
+    font: 500 10px var(--mono);
+    background: rgba(11,13,17,0.74);
+    backdrop-filter: blur(6px);
+    letter-spacing: 0.04em;
   }
-  .phase-clock .phase-state {
-    font-size: 11px; letter-spacing: 0.32em;
-    text-transform: uppercase; color: var(--tungsten);
-    margin-top: 4px; font-weight: 500;
+  .stage-tag {
+    color: var(--fg); display: inline-flex; align-items: center; gap: 6px;
   }
-  .legend {
-    padding: 6px 20px 18px;
-    display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px;
-    font-size: 10px; letter-spacing: 0.1em;
+  .stage-tag .dot {
+    width: 5px; height: 5px; border-radius: 50%; background: var(--accent);
+    animation: minidot 1.6s ease-in-out infinite;
   }
-  .legend .chip { display: flex; align-items: center; gap: 7px; color: var(--ink-dim); }
-  .legend .chip .sw { width: 11px; height: 11px; border: 1px solid; }
-  .legend .chip.g .sw { background: var(--phosphor); border-color: var(--phosphor); }
-  .legend .chip.y .sw { background: var(--amber); border-color: var(--amber); }
-  .legend .chip.r .sw { background: var(--stop); border-color: var(--stop); }
-  .legend .chip.o .sw { background: transparent; border-color: var(--rule); }
+  .stage-meta { color: var(--fg-dim); }
 
-  /* ── CHART ────────────────────────────────── */
-  .chart-wrap { padding: 14px 18px 10px; }
-  .chart-wrap canvas { width: 100%; height: 200px; display: block; }
+  .stage-right { display: flex; align-items: center; gap: 10px; pointer-events: auto; }
+
+  /* AI master toggle — one switch applies to every cam */
+  .ai-toggle {
+    all: unset; cursor: pointer;
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 4px 10px 4px 4px; border-radius: 999px;
+    background: rgba(11,13,17,0.78); backdrop-filter: blur(6px);
+    border: 1px solid var(--border);
+    font: 500 10px var(--mono); letter-spacing: 0.08em;
+    color: var(--fg-dim);
+    transition: border-color 0.2s, color 0.2s;
+  }
+  .ai-toggle:hover { border-color: var(--fg-dim); color: var(--fg); }
+  .ai-sw {
+    width: 28px; height: 16px; border-radius: 999px;
+    background: var(--fg-mute); position: relative;
+    transition: background 0.2s ease;
+  }
+  .ai-knob {
+    position: absolute; top: 2px; left: 2px;
+    width: 12px; height: 12px; border-radius: 50%;
+    background: var(--fg); transition: left 0.2s ease;
+  }
+  .ai-toggle[aria-pressed="true"] {
+    color: var(--accent); border-color: rgba(232,180,100,0.35);
+  }
+  .ai-toggle[aria-pressed="true"] .ai-sw { background: var(--accent); }
+  .ai-toggle[aria-pressed="true"] .ai-knob { left: 14px; background: #0B0D11; }
+  .ai-toggle .ai-lbl b { font-weight: 600; }
+
+  .endpoint-strip {
+    display: flex; gap: 24px; flex-wrap: wrap;
+    padding: 12px 22px;
+    font: 500 11px var(--mono);
+    color: var(--fg-faint);
+    border-top: 1px solid var(--border-soft);
+  }
+  .endpoint-strip a {
+    color: var(--fg-dim); text-decoration: none;
+    border-bottom: 1px solid transparent;
+    transition: color 0.2s, border-color 0.2s;
+  }
+  .endpoint-strip a:hover { color: var(--accent); border-color: var(--accent-dim); }
+
+  /* ── GRID LAYOUT ───────────────────────────── */
+  .grid-3 {
+    display: grid; grid-template-columns: 1.5fr 1fr 1.5fr;
+    gap: 16px; margin-bottom: 24px;
+  }
+  .grid-2 {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 16px;
+    margin-bottom: 24px;
+  }
+
+  /* ── CHARTS ────────────────────────────────── */
+  canvas { display: block; width: 100%; }
+  .chart-wrap { height: 220px; margin-bottom: 16px; }
+  .chart-wrap canvas { height: 100%; }
   .chart-meta {
-    display: grid; grid-template-columns: repeat(3,1fr); gap: 22px;
-    padding: 14px 18px; border-top: 1px solid var(--rule);
-    font-size: 10px;
-  }
-  .chart-meta .m-label {
-    color: var(--ink-dim); letter-spacing: 0.22em; text-transform: uppercase;
-  }
-  .chart-meta .m-value {
-    color: var(--ink); font-size: 22px; margin-top: 4px;
-    font-family: var(--serif); font-style: italic;
-    font-variant-numeric: tabular-nums;
-  }
-
-  /* ── WIRE TICKER ──────────────────────────── */
-  .wire {
-    margin: 0 -44px 34px; padding: 13px 44px;
-    border-top: 1px solid var(--rule); border-bottom: 1px solid var(--rule);
-    background: linear-gradient(180deg, var(--paper-2), var(--paper));
-    position: relative; overflow: hidden;
-  }
-  .wire-label {
-    position: absolute; left: 44px; top: 50%; transform: translateY(-50%);
-    font-size: 10px; letter-spacing: 0.3em; text-transform: uppercase;
-    color: var(--tungsten); padding: 4px 10px;
-    border: 1px solid var(--tungsten); background: var(--paper); z-index: 2;
-    font-weight: 500;
-  }
-  .wire-track {
-    padding-left: 110px; display: flex; gap: 46px;
-    white-space: nowrap; font-size: 12px; color: var(--ink);
-    animation: slide 78s linear infinite;
-    animation-play-state: running;
-  }
-  .wire:hover .wire-track { animation-play-state: paused; }
-  .wire-item { display: inline-flex; align-items: center; gap: 10px; }
-  .wire-item .k { color: var(--phosphor); letter-spacing: 0.1em; }
-  .wire-item .sep { color: var(--ink-dim); }
-  @keyframes slide { to { transform: translateX(-50%); } }
-
-  /* ── LOGS ─────────────────────────────────── */
-  .twocol { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; margin-bottom: 34px; }
-  .log {
-    font-size: 11px; max-height: 300px; overflow-y: auto;
-    padding: 8px 18px 18px;
-    scrollbar-color: var(--rule) transparent; scrollbar-width: thin;
-  }
-  .log::-webkit-scrollbar { width: 6px; }
-  .log::-webkit-scrollbar-thumb { background: var(--rule); }
-  .log .row {
-    padding: 7px 0; border-bottom: 1px dotted var(--rule);
-    display: grid; grid-template-columns: 84px 1fr;
-    gap: 14px; align-items: baseline;
-  }
-  .log .ts { color: var(--ink-dim); letter-spacing: 0.08em; }
-  .log .body { color: var(--ink); word-break: break-word; }
-  .log .body .k { color: var(--phosphor); margin-right: 6px; }
-  .log .body .on  { color: var(--phosphor); }
-  .log .body .red { color: var(--stop); }
-  .log .body .tung { color: var(--tungsten); }
-  .log:empty::before {
-    content: "… awaiting events"; color: var(--ink-dim);
-    font-style: italic; font-family: var(--serif); font-size: 14px;
-    display: block; padding: 14px 0;
-  }
-
-  /* ── HANDLES ──────────────────────────────── */
-  .handles {
     display: grid; grid-template-columns: repeat(3, 1fr);
-    gap: 4px 30px; padding: 18px;
-    font-size: 11px;
+    gap: 16px; padding-top: 12px;
+    border-top: 1px solid var(--border-soft);
   }
-  .handles .h-row {
-    display: grid; grid-template-columns: max-content 1fr; gap: 14px;
-    padding: 5px 0; align-items: baseline;
+  .chart-meta .k {
+    font: 500 10px var(--mono); color: var(--fg-faint);
+    letter-spacing: 0.08em; text-transform: uppercase;
   }
-  .handles b {
-    font-weight: 500; color: var(--ink-dim);
-    text-transform: uppercase; letter-spacing: 0.18em; font-size: 9px;
+  .chart-meta .v {
+    font-weight: 500; font-size: 16px; color: var(--fg);
+    margin-top: 4px; font-variant-numeric: tabular-nums;
+    letter-spacing: -0.01em;
   }
-  .handles a {
-    color: var(--ink); text-decoration: none;
-    border-bottom: 1px dotted var(--rule);
+  .chart-meta .v.accent { color: var(--accent); }
+
+  /* ── APPROACH LIST (horizontal bars) ──────── */
+  .approach {
+    display: grid; grid-template-columns: 28px 1fr auto;
+    gap: 14px; align-items: center;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border-soft);
+    font-family: var(--mono);
   }
-  .handles a:hover { color: var(--tungsten); border-bottom-color: var(--tungsten); }
-  .handles code {
-    color: var(--phosphor); font-size: 11px;
-    background: rgba(159,232,112,0.04); padding: 1px 5px;
+  .approach:last-child { border-bottom: none; }
+  .approach .a {
+    font-weight: 600; font-size: 12px; color: var(--fg);
+    letter-spacing: 0.04em;
+  }
+  .approach .track {
+    height: 4px; border-radius: 2px;
+    background: var(--border); position: relative;
+  }
+  .approach .fill {
+    position: absolute; inset: 0 auto 0 0;
+    border-radius: 2px; background: var(--fg-dim);
+    transition: width 0.35s ease;
+  }
+  .approach.top .fill { background: var(--accent); }
+  .approach .n {
+    font-weight: 500; font-size: 14px; color: var(--fg);
+    font-variant-numeric: tabular-nums;
+    min-width: 56px; text-align: right;
+    letter-spacing: -0.01em;
+  }
+  .approach.top .n { color: var(--accent); }
+
+  /* ── LOG ───────────────────────────────────── */
+  .log {
+    max-height: 280px; overflow-y: auto;
+    margin: 0 -10px; padding: 0 10px;
+    scrollbar-width: thin; scrollbar-color: var(--border) transparent;
+  }
+  .log::-webkit-scrollbar { width: 5px; }
+  .log::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+  .log-row {
+    display: grid; grid-template-columns: 72px 1fr;
+    gap: 12px; align-items: baseline;
+    padding: 7px 0;
+    border-bottom: 1px solid var(--border-soft);
+    font: 400 11.5px var(--mono);
+  }
+  .log-row:last-child { border-bottom: none; }
+  .log-row .ts { color: var(--fg-faint); font-variant-numeric: tabular-nums; }
+  .log-row .body { color: var(--fg); word-break: break-word; }
+  .log-row .body .k { color: var(--accent); margin-right: 6px; }
+  .log-row.x { border-left: 2px solid var(--accent); margin-left: -10px; padding-left: 10px; }
+  .log:empty::before {
+    content: "awaiting events"; display: block;
+    padding: 14px 2px; color: var(--fg-faint);
+    font: 400 12px var(--mono);
   }
 
-  /* ── FOOTER ───────────────────────────────── */
-  footer {
-    margin-top: 48px; padding-top: 22px;
-    border-top: 2px solid var(--ink);
-    display: grid; grid-template-columns: 1fr auto 1fr; gap: 24px;
-    font-size: 10px; letter-spacing: 0.18em;
-    text-transform: uppercase; color: var(--ink-dim);
-    align-items: baseline;
+  /* ── HANDLES ───────────────────────────────── */
+  .handles {
+    display: grid; grid-template-columns: 1fr 1fr;
+    gap: 8px 20px;
+    font: 500 12px var(--mono);
   }
-  footer .center {
-    font-family: var(--serif); font-style: italic;
-    text-transform: none; letter-spacing: 0.02em;
-    font-size: 15px; color: var(--ink); text-align: center;
+  .handle {
+    display: grid; grid-template-columns: 52px 1fr;
+    gap: 10px; align-items: baseline;
+    padding: 6px 0;
+    border-bottom: 1px solid var(--border-soft);
   }
-  footer .right { text-align: right; }
-  footer a { color: var(--ink-dim); text-decoration: none; }
-  footer a:hover { color: var(--tungsten); }
+  .handle b {
+    color: var(--fg-faint); font-weight: 500;
+    font-size: 10px; letter-spacing: 0.14em;
+    text-transform: uppercase;
+  }
+  .handle a, .handle code {
+    color: var(--fg); text-decoration: none;
+    font-family: var(--mono); font-size: 12px;
+  }
+  .handle a:hover { color: var(--accent); }
+  .handle code {
+    background: var(--surface-2); padding: 2px 6px; border-radius: 4px;
+    border: 1px solid var(--border-soft);
+    font-size: 11px; color: var(--fg-dim);
+  }
 
-  /* ── MOTION ───────────────────────────────── */
-  .reveal { opacity: 0; transform: translateY(14px);
-            animation: reveal 0.9s cubic-bezier(0.22,0.8,0.22,1) forwards; }
-  .r1 { animation-delay: 0.02s; }
-  .r2 { animation-delay: 0.16s; }
-  .r3 { animation-delay: 0.32s; }
-  .r4 { animation-delay: 0.48s; }
-  .r5 { animation-delay: 0.60s; }
-  .r6 { animation-delay: 0.72s; }
+  /* ── FOOTER ────────────────────────────────── */
+  .foot {
+    margin-top: 40px; padding-top: 18px;
+    border-top: 1px solid var(--border-soft);
+    display: flex; justify-content: space-between; align-items: center;
+    font: 500 11px var(--mono); color: var(--fg-faint);
+    letter-spacing: 0.02em;
+  }
+  .foot .sep { color: var(--fg-mute); margin: 0 10px; }
+  .foot .right { color: var(--fg-dim); font-variant-numeric: tabular-nums; }
+
+  /* ── MOTION (muted) ─────────────────────────── */
+  .reveal { opacity: 0; transform: translateY(6px);
+            animation: reveal 0.55s cubic-bezier(0.22,0.8,0.22,1) forwards; }
+  .r1 { animation-delay: 0.00s; }
+  .r2 { animation-delay: 0.08s; }
+  .r3 { animation-delay: 0.16s; }
+  .r4 { animation-delay: 0.24s; }
+  .r5 { animation-delay: 0.32s; }
+  .r6 { animation-delay: 0.40s; }
   @keyframes reveal { to { opacity: 1; transform: none; } }
 
+  /* ── RESPONSIVE ─────────────────────────────── */
   @media (max-width: 1100px) {
-    .hero { grid-template-columns: repeat(2, 1fr); }
-    .stat { border-right: none; border-bottom: 1px solid var(--rule); }
-    .grid, .dual, .twocol { grid-template-columns: 1fr; }
-    .masthead-title { font-size: 52px; }
-    .wire-track { animation-duration: 55s; }
+    .metrics { grid-template-columns: repeat(2, 1fr); }
+    .metric { border-right: none; border-bottom: 1px solid var(--border-soft); }
+    .grid-3, .grid-2 { grid-template-columns: 1fr; }
+    .mini-strip { grid-template-columns: repeat(3, 1fr); }
+    .handles { grid-template-columns: 1fr; }
+    .topbar { grid-template-columns: 1fr; }
+    .compliance { justify-content: flex-start; }
+    .meta-right { justify-content: flex-start; }
+  }
+
+  /* ── FORECAST PANEL ─────────────────────────── */
+  .forecast-head {
+    display: grid; grid-template-columns: 1fr auto; gap: 18px;
+    align-items: baseline; margin-bottom: 18px;
+  }
+  .forecast-basis {
+    font: 400 11px var(--mono);
+    color: var(--fg-faint); letter-spacing: 0.01em;
+    line-height: 1.7;
+  }
+  .forecast-basis b { color: var(--fg-dim); font-weight: 500; }
+  .forecast-slider-wrap {
+    display: flex; align-items: center; gap: 14px;
+    padding: 14px 16px; margin-bottom: 18px;
+    background: var(--surface-2); border: 1px solid var(--border-soft);
+    border-radius: var(--r-md);
+  }
+  .forecast-slider-wrap label {
+    font: 500 11px var(--mono);
+    color: var(--fg-faint); letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .forecast-slider-wrap input[type=range] {
+    flex: 1; accent-color: var(--accent);
+    height: 4px;
+  }
+  .forecast-slider-wrap .t-now {
+    font: 600 16px var(--mono);
+    color: var(--accent); min-width: 60px; text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+  .forecast-cards {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px;
+  }
+  .f-card {
+    position: relative;
+    padding: 18px 18px 16px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--r-md);
+    transition: border-color 0.15s;
+  }
+  .f-card .appr {
+    font: 500 10px var(--mono);
+    letter-spacing: 0.12em; text-transform: uppercase;
+    color: var(--fg-faint);
+    margin-bottom: 10px;
+  }
+  .f-card .count {
+    font-weight: 600; font-size: 28px; line-height: 1.0;
+    color: var(--fg); letter-spacing: -0.02em;
+    font-variant-numeric: tabular-nums;
+  }
+  .f-card .count .unit {
+    font-size: 12px; color: var(--fg-faint);
+    font-weight: 400; margin-left: 4px;
+    letter-spacing: 0;
+  }
+  .f-card .ratio {
+    font: 400 11px var(--mono);
+    color: var(--fg-dim); margin-top: 8px;
+  }
+  .f-card .ratio .label {
+    color: var(--fg-faint); margin-right: 6px;
+  }
+  .f-card .signal {
+    position: absolute; top: 16px; right: 16px;
+    display: flex; align-items: center; gap: 6px;
+    font: 500 10px var(--mono);
+    letter-spacing: 0.08em; text-transform: uppercase;
+  }
+  .f-card .signal .dot {
+    width: 10px; height: 10px; border-radius: 50%;
+    background: var(--fg-mute);
+  }
+  .f-card.sig-green { border-color: rgba(127, 168, 137, 0.45); }
+  .f-card.sig-green .signal { color: #7FA889; }
+  .f-card.sig-green .signal .dot {
+    background: #7FA889;
+    box-shadow: 0 0 6px rgba(127,168,137,0.6);
+  }
+  .f-card.sig-yellow { border-color: rgba(232, 180, 100, 0.45); }
+  .f-card.sig-yellow .signal { color: var(--accent); }
+  .f-card.sig-yellow .signal .dot {
+    background: var(--accent);
+    box-shadow: 0 0 6px rgba(232,180,100,0.7);
+  }
+  .f-card.sig-red { border-color: rgba(214, 143, 107, 0.55); }
+  .f-card.sig-red .signal { color: #E46F6F; }
+  .f-card.sig-red .signal .dot {
+    background: #E46F6F;
+    box-shadow: 0 0 8px rgba(228,111,111,0.7);
+  }
+  .f-card.sig-gray .signal { color: var(--fg-mute); }
+
+  @media (max-width: 1100px) {
+    .forecast-cards { grid-template-columns: repeat(2, 1fr); }
   }
 </style></head>
 <body>
 
- <!-- registration marks -->
- <svg class="reg tl" viewBox="0 0 24 24"><path d="M0 1 H16 M1 0 V16" stroke="currentColor" stroke-width="1" fill="none"/><circle cx="19" cy="19" r="3" stroke="currentColor" stroke-width="1" fill="none"/></svg>
- <svg class="reg tr" viewBox="0 0 24 24"><path d="M0 1 H16 M1 0 V16" stroke="currentColor" stroke-width="1" fill="none"/></svg>
- <svg class="reg bl" viewBox="0 0 24 24"><path d="M0 1 H16 M1 0 V16" stroke="currentColor" stroke-width="1" fill="none"/></svg>
- <svg class="reg br" viewBox="0 0 24 24"><path d="M0 1 H16 M1 0 V16" stroke="currentColor" stroke-width="1" fill="none"/></svg>
+<div class="page">
 
- <div class="page">
+  <!-- ── TOPBAR ─────────────────────────────── -->
+  <header class="topbar reveal r1">
+    <div class="brand">
+      <div class="logo" aria-hidden="true"></div>
+      <h1>
+        Traffic Ops
+        <span class="sep">/</span>
+        <span class="site">SITE-001 · Wadi Saqra · Amman</span>
+      </h1>
+    </div>
 
-  <!-- MASTHEAD -->
-  <header class="masthead reveal r1">
-    <div class="masthead-side">
-      <span>No. 001</span>
-      <span>Vol. Phase I</span>
+    <div class="compliance" aria-label="§6.1 CCTV input compliance">
+      <span class="chip" id="chip-cam"><span class="dot"></span><span id="chip-cam-val">1 view · /site1</span></span>
+      <span class="chip" id="chip-proto"><span class="dot"></span><span id="chip-proto-val">—</span></span>
+      <span class="chip" id="chip-codec"><span class="dot"></span><span id="chip-codec-val">—</span></span>
+      <span class="chip" id="chip-res"><span class="dot"></span><span id="chip-res-val">—</span></span>
+      <span class="chip" id="chip-fps"><span class="dot"></span><span id="chip-fps-val">—</span></span>
     </div>
-    <div class="masthead-title">
-      <span class="roman">Traffic</span> <span class="amp">&amp;</span> Operations<br>
-      Briefing
-    </div>
-    <div class="masthead-side right">
-      <span id="masthead-date">—</span>
-      <span>Amman · JOR</span>
+
+    <div class="meta-right">
+      <span class="live-pill" id="liveBadge"><span class="pulse"></span>LIVE</span>
+      <time id="masthead-date">—</time>
     </div>
   </header>
 
-  <div class="masthead-sub reveal r1">
-    <div>Site<br><b>SITE-001 · Wadi Saqra</b></div>
-    <div>Stream<br><b id="streamRes">—</b></div>
-    <div>Detector<br><b>YOLO26n · BoT-SORT</b></div>
-    <div style="text-align:right">Status<br><span class="badge-onair" id="streamStatus"><span class="dot"></span>BOOTING</span></div>
-  </div>
-
-  <!-- HERO METRICS -->
-  <section class="hero reveal r2" aria-label="Hero metrics">
-    <div class="stat">
-      <div class="label">Active Tracks</div>
+  <!-- ── HERO METRICS ───────────────────────── -->
+  <section class="metrics reveal r2" aria-label="Live metrics">
+    <div class="metric">
+      <div class="label">Active tracks</div>
       <div class="value" id="hActive">—</div>
-      <div class="unit">Vehicles observed</div>
+      <div class="sub">Vehicles observed</div>
     </div>
-    <div class="stat accent">
-      <div class="label">Today Volume</div>
+    <div class="metric accent">
+      <div class="label">Volume · 24h</div>
       <div class="value" id="hTotal">—</div>
-      <div class="unit">Aggregated count</div>
+      <div class="sub">Aggregated count</div>
     </div>
-    <div class="stat">
-      <div class="label">Peak Hour</div>
+    <div class="metric">
+      <div class="label">Peak hour</div>
       <div class="value" id="hPeak">—</div>
-      <div class="unit">at <span id="hPeakHour">—</span> local</div>
+      <div class="sub">at <span id="hPeakHour">—</span> local</div>
     </div>
-    <div class="stat phosphor">
-      <div class="label">Current Phase</div>
-      <div class="value" id="hPhase">—</div>
-      <div class="unit" id="hPhaseState">—</div>
+    <div class="metric">
+      <div class="label">Crossings · live</div>
+      <div class="value" id="hCross">0</div>
+      <div class="sub">N/S/E/W combined</div>
     </div>
-    <div class="stat">
-      <div class="label">Inference</div>
+    <div class="metric">
+      <div class="label">Inference p50</div>
       <div class="value" id="hFps">—</div>
-      <div class="unit">ms / frame p50</div>
+      <div class="sub">ms per frame</div>
     </div>
   </section>
 
-  <!-- PRIMARY GRID -->
-  <section class="grid reveal r3">
-    <div class="figure">
-      <div class="figure-head">
-        <span class="fig-id">Fig. 01 · Live</span>
-        <span class="fig-title">Intersection feed — raw versus inferred</span>
-        <span class="fig-meta" id="streamMeta">RTSP · H264 · 1920×1080 · 10 fps</span>
-      </div>
-      <div class="dual">
-        <div class="stream-frame">
-          <img src="/thumb.jpg?ts=0" id="thumb" alt="raw RTSP thumbnail">
-          <div class="stream-badge"><span class="rec"></span>RTSP</div>
+  <!-- ── FEED ───────────────────────────────── -->
+  <section class="feed reveal r3" aria-label="Live feeds">
+    <div class="mini-strip" id="miniStrip">
+      <button class="mini" data-src="live" aria-pressed="true">
+        <img id="miniLive" class="mini-media" src="/thumb.jpg?ts=0" alt="live">
+        <span class="mini-label"><span class="mini-live-dot"></span>LIVE · RTSP</span>
+      </button>
+    </div>
+
+    <div class="stage">
+      <img id="mainImg" class="stage-media"
+           src="/thumb.jpg?ts=0" alt="AI annotated live stream">
+      <video id="mainVid" class="stage-media" style="display:none"
+             muted loop playsinline autoplay preload="auto"
+             disablepictureinpicture controlslist="nodownload noplaybackrate"></video>
+      <div class="stage-chrome">
+        <span class="stage-tag"><span class="dot"></span><span id="stageTag">AI · LIVE</span></span>
+        <div class="stage-right">
+          <button class="ai-toggle" id="aiToggle" aria-pressed="false" type="button">
+            <span class="ai-sw"><span class="ai-knob"></span></span>
+            <span class="ai-lbl">AI <b id="aiState">OFF</b></span>
+          </button>
+          <span class="stage-meta" id="streamMeta">1920×1080 · 10 fps · YOLO26 + BoT-SORT</span>
         </div>
-        <div class="stream-frame">
-          <img src="http://localhost:8081/stream.mjpeg" id="p2stream" alt="annotated live stream">
-          <div class="stream-badge ai"><span class="rec"></span>AI</div>
-          <div class="p2-hint" id="p2hint">
-            <span>ANNOTATED FEED OFFLINE</span>
-            <code>make phase2-live-bg</code>
-          </div>
-        </div>
-      </div>
-      <div class="stream-note">
-        <span>RTSP → <a id="rtspLink" href="#">rtsp://localhost:8554/site1</a></span>
-        <span>HLS → <a href="http://localhost:8888/site1/index.m3u8" target="_blank">:8888/site1</a></span>
-        <span>MJPEG → <a href="http://localhost:8081/stream.mjpeg" target="_blank">:8081/stream.mjpeg</a></span>
       </div>
     </div>
 
-    <div class="figure">
-      <div class="figure-head">
-        <span class="fig-id">Fig. 02 · Signal</span>
-        <span class="fig-title">NEMA phase clock</span>
-        <span class="fig-meta">SITE-001</span>
-      </div>
-      <div class="clock-wrap">
-        <div class="phase-clock">
-          <svg viewBox="-20 -20 280 280" id="phaseSvg">
-            <circle class="ring-bg" cx="120" cy="120" r="90"/>
-          </svg>
-          <div class="center-text">
-            <span class="phase-num" id="pcNum">—</span>
-            <span class="phase-state" id="pcState">IDLE</span>
-          </div>
-        </div>
-      </div>
-      <div class="legend">
-        <span class="chip g"><span class="sw"></span>GREEN</span>
-        <span class="chip y"><span class="sw"></span>AMBER</span>
-        <span class="chip r"><span class="sw"></span>RED</span>
-        <span class="chip o"><span class="sw"></span>INACTIVE</span>
-      </div>
-    </div>
+    <nav class="endpoint-strip">
+      <a id="rtspLink" href="#">rtsp://localhost:8554/site1</a>
+      <a href="http://localhost:8888/site1/index.m3u8" target="_blank">:8888 / hls</a>
+      <a href="/ai-thumb.jpg" target="_blank">:8000 / ai-thumb</a>
+      <a href="/calibrate">/ calibrate</a>
+    </nav>
   </section>
 
-  <!-- WIRE TICKER -->
-  <div class="wire reveal r4">
-    <div class="wire-label">Wire</div>
-    <div class="wire-track" id="wireTrack"><span>—</span></div>
-  </div>
-
-  <!-- COUNTS + HANDLES -->
-  <section class="grid reveal r5">
-    <div class="figure">
-      <div class="figure-head">
-        <span class="fig-id">Fig. 03 · Counts</span>
-        <span class="fig-title">Hourly detector throughput — 24 h</span>
-        <span class="fig-meta" id="chartMeta">—</span>
+  <!-- ── CHARTS + ENDPOINTS ─────────────────── -->
+  <section class="grid-3 reveal r4">
+    <div class="panel">
+      <div class="panel-title">
+        <h2>Hourly throughput</h2>
+        <span class="hint" id="chartMeta">—</span>
       </div>
       <div class="chart-wrap"><canvas id="chart"></canvas></div>
       <div class="chart-meta">
-        <div><div class="m-label">Date</div><div class="m-value" id="chartDate">—</div></div>
-        <div><div class="m-label">Detectors</div><div class="m-value" id="chartDet">—</div></div>
-        <div><div class="m-label">Volume</div><div class="m-value" id="chartTot">—</div></div>
+        <div><div class="k">Date</div><div class="v" id="chartDate">—</div></div>
+        <div><div class="k">Detectors</div><div class="v" id="chartDet">—</div></div>
+        <div><div class="k">Volume</div><div class="v accent" id="chartTot">—</div></div>
       </div>
     </div>
 
-    <div class="figure">
-      <div class="figure-head">
-        <span class="fig-id">Fig. 04 · Handles</span>
-        <span class="fig-title">Local endpoints &amp; artefacts</span>
-        <span class="fig-meta">localhost</span>
+    <div class="panel">
+      <div class="panel-title">
+        <h2>Approach crossings</h2>
+        <span class="hint" id="approachMeta">live</span>
+      </div>
+      <div id="approachList">
+        <div class="approach" data-a="N"><span class="a">N</span><span class="track"><span class="fill" id="barN" style="width:0%"></span></span><span class="n" id="cN">0</span></div>
+        <div class="approach" data-a="S"><span class="a">S</span><span class="track"><span class="fill" id="barS" style="width:0%"></span></span><span class="n" id="cS">0</span></div>
+        <div class="approach" data-a="E"><span class="a">E</span><span class="track"><span class="fill" id="barE" style="width:0%"></span></span><span class="n" id="cE">0</span></div>
+        <div class="approach" data-a="W"><span class="a">W</span><span class="track"><span class="fill" id="barW" style="width:0%"></span></span><span class="n" id="cW">0</span></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title">
+        <h2>Endpoints</h2>
+        <span class="hint">localhost</span>
       </div>
       <div class="handles">
-        <div class="h-row"><b>UI</b><a href="http://localhost:8000/" target="_blank">:8000 · dashboard</a></div>
-        <div class="h-row"><b>AI</b><a href="http://localhost:8081/" target="_blank">:8081 · MJPEG</a></div>
-        <div class="h-row"><b>RTSP</b><a href="#" id="h-rtsp">:8554 · stream</a></div>
-        <div class="h-row"><b>HLS</b><a href="http://localhost:8888/site1/index.m3u8" target="_blank">:8888 · site1</a></div>
-        <div class="h-row"><b>Ctl</b><a href="http://localhost:9997/v3/paths/list" target="_blank">:9997 · mediamtx</a></div>
-        <div class="h-row"><b>CVAT</b><a href="http://localhost:8080" target="_blank">:8080 · annotate</a></div>
-        <div class="h-row"><b>Repo</b><code>~/traffic-intel</code></div>
-        <div class="h-row"><b>Data</b><code>data/*</code></div>
-        <div class="h-row"><b>Verify</b><code>make sandbox-verify</code></div>
+        <div class="handle"><b>UI</b><a href="http://localhost:8000/" target="_blank">:8000 dashboard</a></div>
+        <div class="handle"><b>AI</b><a href="http://localhost:8081/" target="_blank">:8081 mjpeg</a></div>
+        <div class="handle"><b>RTSP</b><a href="#" id="h-rtsp">:8554 stream</a></div>
+        <div class="handle"><b>HLS</b><a href="http://localhost:8888/site1/index.m3u8" target="_blank">:8888 site1</a></div>
+        <div class="handle"><b>Ctl</b><a href="http://localhost:9997/v3/paths/list" target="_blank">:9997 mediamtx</a></div>
+        <div class="handle"><b>Cvat</b><a href="http://localhost:8080" target="_blank">:8080 annotate</a></div>
+        <div class="handle"><b>Calib</b><a href="/calibrate">/calibrate</a></div>
+        <div class="handle"><b>Verify</b><code>make sandbox-verify</code></div>
       </div>
     </div>
   </section>
 
-  <!-- LOGS -->
-  <section class="twocol reveal r6">
-    <div class="figure">
-      <div class="figure-head">
-        <span class="fig-id">Fig. 05 · Signal log</span>
-        <span class="fig-title">NEMA phase transitions</span>
-        <span class="fig-meta">last 20</span>
-      </div>
-      <div class="log" id="logSignal"></div>
+  <!-- ── AI EVENT LOG ───────────────────────── -->
+  <section class="panel reveal r5" style="margin-bottom: 24px;">
+    <div class="panel-title">
+      <h2>AI events</h2>
+      <span class="hint">last 20 · phase2.ndjson</span>
     </div>
-    <div class="figure">
-      <div class="figure-head">
-        <span class="fig-id">Fig. 06 · AI log</span>
-        <span class="fig-title">Detect &amp; track events</span>
-        <span class="fig-meta">last 20</span>
-      </div>
-      <div class="log" id="logPhase2"></div>
-    </div>
+    <div class="log" id="logPhase2"></div>
   </section>
 
-  <!-- FOOTER -->
-  <footer>
-    <div>Sources · Veo 3 · Synthetic NEMA · CVAT seed</div>
-    <div class="center">Traffic &amp; Operations Briefing · Phase 1 Sandbox · Hackathon</div>
-    <div class="right"><span id="localClock">—</span></div>
+  <!-- ── FOOTER ─────────────────────────────── -->
+  <footer class="foot reveal r6">
+    <div>
+      Traffic Ops
+      <span class="sep">/</span>
+      Phase 1 Sandbox
+      <span class="sep">/</span>
+      Hackathon 2026
+    </div>
+    <div class="right"><time id="localClock">—</time></div>
   </footer>
 
- </div>
+</div>
 
- <script>
-  'use strict';
-  const el = id => document.getElementById(id);
-  const SVG_NS = 'http://www.w3.org/2000/svg';
-  const RTSP_URL = 'rtsp://localhost:8554/site1';
+<script>
+'use strict';
+const el = id => document.getElementById(id);
+const RTSP_URL = 'rtsp://localhost:8554/site1';
 
-  // ── Clock + masthead date ────────────────
-  const MONTHS = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
-  function pad2(n) { return String(n).padStart(2, '0'); }
-  function fmtDate(d) {
-    return pad2(d.getDate()) + ' ' + MONTHS[d.getMonth()] + ' ' + d.getFullYear();
-  }
-  function tickClock() {
-    const d = new Date();
-    el('masthead-date').textContent = fmtDate(d);
-    el('localClock').textContent = pad2(d.getHours()) + ':' + pad2(d.getMinutes())
-                                   + ':' + pad2(d.getSeconds()) + ' LOCAL';
-  }
-  tickClock(); setInterval(tickClock, 1000);
+// ── Clock ─────────────────────────────────────
+const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+function pad2(n) { return String(n).padStart(2, '0'); }
+function tickClock() {
+  const d = new Date();
+  const time = pad2(d.getHours()) + ':' + pad2(d.getMinutes()) + ':' + pad2(d.getSeconds());
+  el('masthead-date').textContent = pad2(d.getDate()) + ' ' + MONTHS[d.getMonth()] + ' ' + d.getFullYear() + '  ·  ' + time;
+  el('localClock').textContent = time;
+}
+setInterval(tickClock, 1000); tickClock();
 
-  // ── Copy-on-click RTSP links ─────────────
-  [el('rtspLink'), el('h-rtsp')].forEach(a => {
-    if (!a) return;
-    a.addEventListener('click', e => {
-      e.preventDefault();
-      try { navigator.clipboard.writeText(RTSP_URL); } catch (_e) {}
-      const orig = a.textContent;
-      a.textContent = 'copied ✓'; a.style.color = 'var(--phosphor)';
-      setTimeout(() => { a.textContent = orig; a.style.color = ''; }, 1200);
-    });
+// ── RTSP copy ─────────────────────────────────
+[el('rtspLink'), el('h-rtsp')].forEach(a => {
+  if (!a) return;
+  a.addEventListener('click', e => {
+    e.preventDefault();
+    try { navigator.clipboard.writeText(RTSP_URL); } catch(_) {}
+    const orig = a.textContent;
+    a.textContent = 'copied';
+    a.style.color = 'var(--accent)';
+    setTimeout(() => { a.textContent = orig; a.style.color = ''; }, 1100);
   });
+});
 
-  // ── Raw thumb refresh ────────────────────
-  setInterval(() => { el('thumb').src = '/thumb.jpg?ts=' + Date.now(); }, 2000);
+// ── LIVE mini snapshot refresh ────────────────
+setInterval(() => { const m = el('miniLive'); if (m) m.src = '/thumb.jpg?ts=' + Date.now(); }, 2000);
 
-  // If MJPEG fails to load, show the hint
-  const p2 = el('p2stream');
-  if (p2) p2.addEventListener('error', () => {
-    const h = el('p2hint'); if (h) h.style.display = 'flex';
-    p2.style.visibility = 'hidden';
+// ── Mini strip + main stage ──────────────────
+const miniStrip = el('miniStrip');
+const mainImg   = el('mainImg');
+const mainVid   = el('mainVid');
+const stageTag  = el('stageTag');
+const streamMeta = el('streamMeta');
+let activeSrc = 'live';
+
+// LIVE AI via snapshot polling — MJPEG multipart breaks Chromium in this VM
+let _aiPoll = null;
+function stopMjpeg() {
+  if (_aiPoll) { clearInterval(_aiPoll); _aiPoll = null; }
+  if (mainImg.src) { mainImg.removeAttribute('src'); try { mainImg.src = ''; } catch(_) {} }
+}
+function startMjpeg() {
+  mainImg.style.display = '';
+  mainVid.style.display = 'none';
+  try { mainVid.pause(); } catch(_) {}
+  mainVid.removeAttribute('src'); try { mainVid.load(); } catch(_) {}
+  if (_aiPoll) clearInterval(_aiPoll);
+  const tick = () => { mainImg.src = '/ai-thumb.jpg?ts=' + Date.now(); };
+  tick();
+  _aiPoll = setInterval(tick, 400);
+}
+// No MP4 playback — Chrome in this VM SIGILLs on any <video> element.
+// All cams render via <img>: LIVE = MJPEG (image stream), angles = hi-res poster.
+function stopMp4() {
+  try { mainVid.pause(); } catch(_) {}
+  mainVid.removeAttribute('src'); try { mainVid.load(); } catch(_) {}
+  mainVid.style.display = 'none';
+}
+function showPoster(url) {
+  stopMp4(); stopMjpeg();
+  mainImg.style.display = '';
+  if (url) mainImg.src = url;
+}
+function showThumb() {
+  stopMp4(); stopMjpeg();
+  mainImg.style.display = '';
+  mainImg.src = '/thumb.jpg?ts=' + Date.now();
+}
+
+// AI master toggle — affects every cam. Default OFF so MJPEG doesn't autoload
+// on first paint (heavy stream can crash Chromium-in-VM tabs). User clicks to engage.
+let aiOn = false;
+const aiToggleBtn = el('aiToggle');
+const aiStateLbl  = el('aiState');
+
+// Cam registry: { src: {label, raw_url, ai_url, is_live} }
+const cams = { live: { label: 'LIVE', is_live: true } };
+let activeCamSrc = 'live';
+
+function applyCam(src) {
+  activeCamSrc = src;
+  const c = cams[src] || cams.live;
+  document.querySelectorAll('.mini').forEach(m => {
+    m.setAttribute('aria-pressed', m.dataset.src === src ? 'true' : 'false');
   });
-
-  // ── Phase clock (NEMA 8-segment donut) ───
-  function renderPhaseRing(currentPhase, currentState) {
-    const svg = el('phaseSvg');
-    svg.querySelectorAll('.ring-seg, .phase-label').forEach(n => n.remove());
-    const cx = 120, cy = 120, r = 90;
-    const N = 8, gap = 4;
-    const segDeg = 360 / N - gap;
-    const C = 2 * Math.PI * r;
-    const colorFor = (active, state) => {
-      if (!active) return 'rgba(42,43,38,1)';
-      if (state === 'GREEN_ON')  return '#9FE870';
-      if (state === 'YELLOW_ON') return '#F1C40F';
-      if (state === 'RED_ON')    return '#FF3D3D';
-      return '#F0E8D8';
-    };
-    for (let i = 0; i < N; i++) {
-      const phase = i + 1;
-      const startDeg = i * (360 / N) + gap / 2;
-      const seg = document.createElementNS(SVG_NS, 'circle');
-      seg.setAttribute('class', 'ring-seg');
-      seg.setAttribute('cx', cx); seg.setAttribute('cy', cy); seg.setAttribute('r', r);
-      const segLen = C * segDeg / 360;
-      seg.setAttribute('stroke-dasharray', segLen + ' ' + (C - segLen));
-      seg.setAttribute('stroke-dashoffset', -C * startDeg / 360);
-      const active = phase === currentPhase;
-      seg.setAttribute('stroke', colorFor(active, currentState));
-      if (active) seg.setAttribute('filter', 'drop-shadow(0 0 6px ' + colorFor(true, currentState) + ')');
-      svg.appendChild(seg);
-
-      // Phase numeral label outside the ring
-      const midDeg = i * (360 / N) + (360 / N) / 2 - 90;
-      const rad = midDeg * Math.PI / 180;
-      const lx = cx + Math.cos(rad) * (r + 26);
-      const ly = cy + Math.sin(rad) * (r + 26);
-      const text = document.createElementNS(SVG_NS, 'text');
-      text.setAttribute('class', 'phase-label');
-      text.setAttribute('x', lx); text.setAttribute('y', ly);
-      text.setAttribute('text-anchor', 'middle');
-      text.setAttribute('dominant-baseline', 'central');
-      text.setAttribute('transform', 'rotate(90 ' + lx + ' ' + ly + ')');
-      text.setAttribute('fill', active ? '#FF6A00' : '#8A8777');
-      text.setAttribute('font-family', 'JetBrains Mono, monospace');
-      text.setAttribute('font-size', '11');
-      text.setAttribute('font-weight', active ? '700' : '400');
-      text.setAttribute('letter-spacing', '0.12em');
-      text.textContent = 'φ' + phase;
-      svg.appendChild(text);
-    }
-    el('pcNum').textContent = currentPhase != null ? String(currentPhase) : '—';
-    const niceState = { GREEN_ON: 'GREEN', YELLOW_ON: 'AMBER', RED_ON: 'RED' }[currentState] || 'IDLE';
-    el('pcState').textContent = niceState;
+  if (c.is_live) {
+    stageTag.textContent = (aiOn ? 'AI · LIVE' : 'LIVE · RAW');
+    streamMeta.textContent = aiOn ? 'snapshot · YOLO26 · BoT-SORT · 400ms' : 'RTSP snapshot · refresh 2s';
+    if (aiOn) startMjpeg(); else showThumb();
+  } else {
+    stageTag.textContent = (aiOn ? 'AI · ' : 'RAW · ') + (c.label || src).toUpperCase();
+    streamMeta.textContent = aiOn ? 'annotated · YOLO26 + BoT-SORT · looping' : 'raw · looping';
+    // AI ON: annotated WebP. AI OFF: raw WebP (no boxes).
+    const url = aiOn
+      ? (c.anim_url || c.poster_url)
+      : (c.raw_anim_url || c.raw_poster_url || c.poster_url);
+    showPoster(url);
   }
-  renderPhaseRing(null, null);
+}
+function selectMini(src) { applyCam(src); }
 
-  // ── Parsing helpers ──────────────────────
-  function safeJson(line) { try { return JSON.parse(line); } catch { return null; } }
-  function shortTs(iso) { return (iso || '').slice(11, 19); }
-  function stateColor(st) {
-    if (st === 'GREEN_ON') return 'on';
-    if (st === 'RED_ON') return 'red';
-    if (st === 'YELLOW_ON') return 'tung';
-    return '';
-  }
+aiToggleBtn.addEventListener('click', () => {
+  aiOn = !aiOn;
+  aiToggleBtn.setAttribute('aria-pressed', aiOn ? 'true' : 'false');
+  aiStateLbl.textContent = aiOn ? 'ON' : 'OFF';
+  applyCam(activeCamSrc);
+});
 
-  // ── Log renderers (safe DOM only) ───────
-  function renderSignalLog(lines) {
-    const c = el('logSignal'); c.replaceChildren();
-    const recent = (lines || []).slice(-20).reverse();
-    for (const line of recent) {
-      const o = safeJson(line); if (!o) continue;
-      const row = document.createElement('div'); row.className = 'row';
-      const ts  = document.createElement('span'); ts.className = 'ts';
-      ts.textContent = shortTs(o.timestamp);
-      const body = document.createElement('span'); body.className = 'body';
-      const k = document.createElement('span'); k.className = 'k';
-      k.textContent = 'φ' + o.phase;
-      const sep = document.createElement('span'); sep.textContent = ' ';
-      const st  = document.createElement('span');
-      st.className = stateColor(o.state);
-      st.textContent = (o.state || '').replace('_ON','');
-      body.append(k, sep, st);
-      row.append(ts, body);
-      c.append(row);
-    }
-  }
-  function renderPhase2Log(lines) {
-    const c = el('logPhase2'); c.replaceChildren();
-    const recent = (lines || []).slice(-20).reverse();
-    for (const line of recent) {
-      const o = safeJson(line); if (!o) continue;
-      const row = document.createElement('div'); row.className = 'row';
-      const ts  = document.createElement('span'); ts.className = 'ts';
-      ts.textContent = shortTs(o.timestamp);
-      const body = document.createElement('span'); body.className = 'body';
-      const k = document.createElement('span'); k.className = 'k';
-      k.textContent = (o.event_type || 'event');
-      body.append(k);
-      let tail = '';
-      if (o.event_type === 'stop_line_crossing')
-        tail = ' ' + o.approach + ' Δ' + o.delta + '  in:' + o.in_count + ' out:' + o.out_count;
-      else if (o.event_type === 'zone_occupancy')
-        tail = ' ' + (o.name || '') + ' n=' + o.count + ' (was ' + o.prev + ')';
-      else if (o.event_type === 'run_start')
-        tail = ' model=' + (o.model || '') + ' dev=' + (o.device || '');
-      else if (o.event_type === 'run_end')
-        tail = ' frames=' + o.frames + ' fps=' + o.fps + ' tracks=' + o.unique_tracks;
-      const tailNode = document.createElement('span');
-      tailNode.textContent = tail;
-      body.append(tailNode);
-      row.append(ts, body);
-      c.append(row);
-    }
-  }
+// Thumbnail refresher for LIVE view when AI is off
+setInterval(() => {
+  if (activeCamSrc === 'live' && !aiOn) mainImg.src = '/thumb.jpg?ts=' + Date.now();
+}, 2000);
 
-  // ── Wire ticker ─────────────────────────
-  function renderWire(signalLines, p2Lines) {
-    const track = el('wireTrack'); track.replaceChildren();
-    const items = [];
-    for (const line of (p2Lines || []).slice(-8)) {
-      const o = safeJson(line); if (!o) continue;
-      const t = shortTs(o.timestamp);
-      let msg = (o.event_type || '');
-      if (o.event_type === 'stop_line_crossing')
-        msg += ' ' + o.approach + ' Δ' + o.delta;
-      else if (o.event_type === 'zone_occupancy')
-        msg += ' ' + (o.name || '') + ' n=' + o.count;
-      items.push(['ai', t, msg]);
+document.querySelector('.mini[data-src="live"]').addEventListener('click', () => selectMini('live'));
+
+async function loadVideos() {
+  try {
+    const resp = await fetch('/api/videos');
+    const data = await resp.json();
+    const videos = (data.videos || []).filter(v => v.has_ai);
+    for (const v of videos) {
+      cams[v.name] = {
+        label: v.label, raw_url: v.url, ai_url: v.ai_url,
+        poster_url: v.poster_url, anim_url: v.anim_url,
+        raw_poster_url: v.raw_poster_url, raw_anim_url: v.raw_anim_url,
+        is_live: false,
+      };
+
+      const mini = document.createElement('button');
+      mini.className = 'mini';
+      mini.dataset.src = v.name;
+      mini.setAttribute('aria-pressed', 'false');
+      mini.title = v.label + '  ·  ' + (v.size / 1e6).toFixed(1) + ' MB';
+
+      // Static poster — avoids 5 concurrent H.264 decoders in the browser tab.
+      const media = document.createElement('img');
+      media.className = 'mini-media';
+      media.alt = v.label;
+      media.loading = 'lazy';
+      media.src = v.poster_url || v.ai_url;  // fallback to ai_url if poster gen failed
+      media.addEventListener('error', () => { media.style.opacity = '0.2'; });
+
+      const label = document.createElement('span');
+      label.className = 'mini-label';
+      label.textContent = v.label;
+
+      mini.append(media, label);
+      mini.addEventListener('click', () => selectMini(v.name));
+      miniStrip.appendChild(mini);
     }
-    for (const line of (signalLines || []).slice(-6)) {
-      const o = safeJson(line); if (!o) continue;
-      items.push(['sig', shortTs(o.timestamp),
-                  'φ' + o.phase + ' ' + (o.state || '').replace('_ON','')]);
+  } catch(_) {}
+}
+// Kick off loadVideos unconditionally — even if later setup fails it still fills the mini strip.
+(async () => {
+  try { await loadVideos(); } catch (_) {}
+  try { applyCam('live'); } catch (_) {}
+})();
+
+mainImg.addEventListener('error', () => {
+  if (activeSrc === 'live') {
+    stageTag.textContent = 'LIVE · offline (run make phase2-live-bg)';
+  }
+});
+
+// ── §6.1 chips ────────────────────────────────
+function setChip(id, ok, valText) {
+  const c = el(id); if (!c) return;
+  c.classList.toggle('ok', !!ok);
+  c.classList.toggle('bad', !ok);
+  const v = c.querySelector('span:last-child');
+  if (v && valText != null) v.textContent = valText;
+}
+function updateChips(s) {
+  setChip('chip-cam', true, '1 view · /site1');
+  if (s && !s.error) {
+    const isRtsp = (s.url || '').startsWith('rtsp://');
+    setChip('chip-proto', isRtsp, isRtsp ? 'rtsp · tcp' : (s.url || '—'));
+    const codecOk = s.codec === 'h264' || s.codec === 'hevc';
+    setChip('chip-codec', codecOk, codecOk ? (s.codec || '').toUpperCase() : (s.codec || '—'));
+    const resOk = s.width === 1920 && s.height === 1080;
+    setChip('chip-res', resOk, (s.width || '?') + '×' + (s.height || '?'));
+    const fps = s.fps || 0;
+    const fpsOk = fps >= 5 && fps <= 15;
+    setChip('chip-fps', fpsOk, fps.toFixed(1) + ' fps');
+  } else {
+    setChip('chip-proto', false, '—');
+    setChip('chip-codec', false, '—');
+    setChip('chip-res', false, '—');
+    setChip('chip-fps', false, '—');
+  }
+  const live = el('liveBadge');
+  live.classList.toggle('off', !s.healthy);
+  live.replaceChildren();
+  const p = document.createElement('span'); p.className = 'pulse';
+  live.append(p, document.createTextNode(s.healthy ? 'LIVE' : 'OFFLINE'));
+}
+
+// ── Parsing helpers ───────────────────────────
+function safeJson(line) { try { return JSON.parse(line); } catch { return null; } }
+function shortTs(iso) { return (iso || '').slice(11, 19); }
+
+// ── Phase 2 event log ────────────────────────
+function renderPhase2Log(lines) {
+  const c = el('logPhase2'); c.replaceChildren();
+  const recent = (lines || []).slice(-20).reverse();
+  for (const line of recent) {
+    const o = safeJson(line); if (!o) continue;
+    const row = document.createElement('div');
+    row.className = 'log-row' + (o.event_type === 'stop_line_crossing' ? ' x' : '');
+    const ts = document.createElement('span'); ts.className = 'ts';
+    ts.textContent = shortTs(o.timestamp);
+    const body = document.createElement('span'); body.className = 'body';
+    const k = document.createElement('span'); k.className = 'k';
+    k.textContent = (o.event_type || 'event');
+    body.append(k);
+    let tail = '';
+    if (o.event_type === 'stop_line_crossing')
+      tail = ' ' + o.approach + ' Δ' + o.delta + '  in ' + o.in_count + '  out ' + o.out_count;
+    else if (o.event_type === 'zone_occupancy')
+      tail = ' ' + (o.name || '') + ' n=' + o.count + ' (was ' + o.prev + ')';
+    else if (o.event_type === 'run_start')
+      tail = ' model=' + (o.model || '') + ' dev=' + (o.device || '');
+    else if (o.event_type === 'run_end')
+      tail = ' frames=' + o.frames + ' fps=' + o.fps + ' tracks=' + o.unique_tracks;
+    const tailNode = document.createElement('span');
+    tailNode.textContent = tail;
+    body.append(tailNode);
+    row.append(ts, body);
+    c.append(row);
+  }
+}
+
+// ── Approach crossings ───────────────────────
+const approachState = { N: 0, S: 0, E: 0, W: 0 };
+function updateApproachCounts(p2Lines) {
+  const seen = new Set();
+  for (let i = p2Lines.length - 1; i >= 0 && seen.size < 4; i--) {
+    const o = safeJson(p2Lines[i]);
+    if (!o || o.event_type !== 'stop_line_crossing') continue;
+    const a = o.approach;
+    if (!a || seen.has(a)) continue;
+    approachState[a] = (o.in_count || 0) + (o.out_count || 0);
+    seen.add(a);
+  }
+  const apps = ['N','S','E','W'];
+  const max = Math.max(1, ...apps.map(a => approachState[a]));
+  let topA = apps[0], topV = -1;
+  for (const a of apps) if (approachState[a] > topV) { topV = approachState[a]; topA = a; }
+  for (const a of apps) {
+    el('c' + a).textContent = approachState[a].toLocaleString();
+    el('bar' + a).style.width = (approachState[a] / max * 100) + '%';
+    const row = document.querySelector('.approach[data-a="' + a + '"]');
+    if (row) row.classList.toggle('top', a === topA && approachState[a] > 0);
+  }
+  const total = approachState.N + approachState.S + approachState.E + approachState.W;
+  el('hCross').textContent = total.toLocaleString();
+  el('approachMeta').textContent = total ? total.toLocaleString() + ' · live' : 'live';
+}
+
+// ── Canvas chart ─────────────────────────────
+function drawChart(c) {
+  const cv = el('chart'); const ctx = cv.getContext('2d');
+  const DPR = window.devicePixelRatio || 1;
+  const W = cv.width = cv.clientWidth * DPR;
+  const H = cv.height = cv.clientHeight * DPR;
+  ctx.clearRect(0, 0, W, H);
+  if (!c.hourly || !c.hourly.length) {
+    ctx.fillStyle = '#5A616B';
+    ctx.font = (12 * DPR) + 'px ui-monospace, monospace';
+    ctx.fillText('awaiting data', 8 * DPR, 24 * DPR);
+    return;
+  }
+  const PAD_L = 40 * DPR, PAD_B = 26 * DPR, PAD_T = 12 * DPR, PAD_R = 8 * DPR;
+  const plotW = W - PAD_L - PAD_R;
+  const plotH = H - PAD_B - PAD_T;
+  const max = Math.max(...c.hourly) || 1;
+  // gridlines (very quiet)
+  ctx.strokeStyle = '#1A1D23'; ctx.lineWidth = 1;
+  ctx.beginPath();
+  for (let i = 0; i <= 4; i++) {
+    const y = Math.round(PAD_T + plotH * i / 4) + 0.5;
+    ctx.moveTo(PAD_L, y); ctx.lineTo(W - PAD_R, y);
+  }
+  ctx.stroke();
+  // y axis labels
+  ctx.fillStyle = '#5A616B';
+  ctx.font = (10 * DPR) + 'px ui-monospace, monospace';
+  ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+  for (let i = 0; i <= 4; i++) {
+    const v = Math.round(max * (1 - i / 4));
+    ctx.fillText(v.toLocaleString(), PAD_L - 8 * DPR, PAD_T + plotH * i / 4);
+  }
+  // bars — flat amber
+  const bw = plotW / 24 * 0.68;
+  const gap = plotW / 24 - bw;
+  const peak = c.hourly.indexOf(max);
+  c.hourly.forEach((v, i) => {
+    const h = plotH * v / max;
+    const x = PAD_L + i * (plotW / 24) + gap / 2;
+    const y = PAD_T + plotH - h;
+    ctx.fillStyle = (i === peak) ? '#E8B464' : '#3E444D';
+    ctx.fillRect(x, y, bw, h);
+  });
+  // x axis
+  ctx.fillStyle = '#5A616B';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+  ctx.font = (10 * DPR) + 'px ui-monospace, monospace';
+  [0, 6, 12, 18, 23].forEach(i => {
+    const x = PAD_L + i * (plotW / 24) + (plotW / 24) / 2;
+    ctx.fillText(pad2(i) + ':00', x, PAD_T + plotH + 6 * DPR);
+  });
+}
+
+// ── Number counter animation ─────────────────
+function animateNumber(node, target) {
+  const start = performance.now();
+  const duration = 900;
+  (function step(now) {
+    const t = Math.min(1, (now - start) / duration);
+    const e = 1 - Math.pow(1 - t, 3);
+    node.textContent = Math.round(target * e).toLocaleString();
+    if (t < 1) requestAnimationFrame(step);
+  })(start);
+}
+
+// ── Poll loop ────────────────────────────────
+async function poll() {
+  try { updateChips(await fetch('/api/status').then(r => r.json())); } catch(_) {}
+  try {
+    const c = await fetch('/api/counts').then(r => r.json());
+    drawChart(c);
+    el('chartDate').textContent = c.date || '—';
+    el('chartDet').textContent  = String(c.detectors || 0);
+    el('chartTot').textContent  = (c.total || 0).toLocaleString();
+    el('chartMeta').textContent = (c.date || '—') + ' · 24h';
+
+    if (!el('hTotal').dataset.done) {
+      animateNumber(el('hTotal'), c.total || 0);
+      el('hTotal').dataset.done = '1';
+    } else {
+      el('hTotal').textContent = (c.total || 0).toLocaleString();
     }
-    if (!items.length) {
-      const s = document.createElement('span');
-      s.textContent = 'AWAITING EVENTS…';
-      s.style.color = 'var(--ink-dim)';
-      track.append(s);
-      return;
+    if (c.hourly && c.hourly.length) {
+      const pk = Math.max(...c.hourly);
+      const pkIdx = c.hourly.indexOf(pk);
+      el('hPeak').textContent = pk.toLocaleString();
+      el('hPeakHour').textContent = pad2(pkIdx) + ':00';
     }
-    // duplicate for seamless loop
-    for (let pass = 0; pass < 2; pass++) {
-      for (const [klass, t, msg] of items) {
-        const item = document.createElement('span'); item.className = 'wire-item';
-        const k = document.createElement('span'); k.className = 'k'; k.textContent = t;
-        const sep = document.createElement('span'); sep.className = 'sep'; sep.textContent = '⋅';
-        const body = document.createElement('span'); body.textContent = msg;
-        if (klass === 'sig') body.style.color = 'var(--tungsten)';
-        item.append(k, sep, body);
-        track.append(item);
+  } catch(_) {}
+  try {
+    const p2data = await fetch('/api/phase2').then(r => r.json());
+    const p2Lines = p2data.lines || [];
+    renderPhase2Log(p2Lines);
+    updateApproachCounts(p2Lines);
+
+    let tracks = null, p50 = null;
+    for (let i = p2Lines.length - 1; i >= 0; i--) {
+      const o = safeJson(p2Lines[i]); if (!o) continue;
+      if (o.event_type === 'run_end') {
+        tracks = o.unique_tracks;
+        p50 = o.latency_ms && o.latency_ms.p50;
+        break;
       }
     }
-  }
-
-  // ── Canvas chart ────────────────────────
-  function drawChart(c) {
-    const cv = el('chart'); const ctx = cv.getContext('2d');
-    const DPR = window.devicePixelRatio || 1;
-    const W = cv.width = cv.clientWidth * DPR;
-    const H = cv.height = cv.clientHeight * DPR;
-    ctx.clearRect(0, 0, W, H);
-
-    if (!c.hourly || !c.hourly.length) {
-      ctx.fillStyle = '#8A8777';
-      ctx.font = 'italic ' + (14 * DPR) + 'px "Instrument Serif", serif';
-      ctx.fillText('awaiting data', 8 * DPR, 24 * DPR);
-      return;
+    if (tracks != null && !el('hActive').dataset.done) {
+      animateNumber(el('hActive'), tracks); el('hActive').dataset.done = '1';
+    } else if (tracks != null) {
+      el('hActive').textContent = tracks.toLocaleString();
     }
-    const PAD_L = 44 * DPR, PAD_B = 26 * DPR, PAD_T = 12 * DPR, PAD_R = 10 * DPR;
-    const plotW = W - PAD_L - PAD_R;
-    const plotH = H - PAD_B - PAD_T;
-    const max = Math.max(...c.hourly) || 1;
-
-    // horizontal gridlines
-    ctx.strokeStyle = '#2A2B26'; ctx.lineWidth = 1;
-    ctx.beginPath();
-    for (let i = 0; i <= 4; i++) {
-      const y = Math.round(PAD_T + plotH * i / 4) + 0.5;
-      ctx.moveTo(PAD_L, y); ctx.lineTo(W - PAD_R, y);
-    }
-    ctx.stroke();
-
-    // Y axis labels
-    ctx.fillStyle = '#8A8777';
-    ctx.font = (9 * DPR) + 'px "JetBrains Mono", monospace';
-    ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
-    for (let i = 0; i <= 4; i++) {
-      const v = Math.round(max * (1 - i / 4));
-      ctx.fillText(v.toLocaleString(), PAD_L - 8 * DPR, PAD_T + plotH * i / 4);
-    }
-
-    // Bars
-    const bw = plotW / 24 * 0.72;
-    const gap = plotW / 24 - bw;
-    c.hourly.forEach((v, i) => {
-      const h = plotH * v / max;
-      const x = PAD_L + i * (plotW / 24) + gap / 2;
-      const y = PAD_T + plotH - h;
-      const g = ctx.createLinearGradient(0, y, 0, PAD_T + plotH);
-      g.addColorStop(0, '#FF6A00');
-      g.addColorStop(1, 'rgba(255,106,0,0.18)');
-      ctx.fillStyle = g; ctx.fillRect(x, y, bw, h);
-      ctx.fillStyle = '#F0E8D8'; ctx.fillRect(x, y - 1.5 * DPR, bw, 1.5 * DPR);
-    });
-
-    // X axis
-    ctx.fillStyle = '#8A8777';
-    ctx.textAlign = 'center'; ctx.textBaseline = 'top';
-    ctx.font = (9 * DPR) + 'px "JetBrains Mono", monospace';
-    [0, 6, 12, 18, 23].forEach(i => {
-      const x = PAD_L + i * (plotW / 24) + (plotW / 24) / 2;
-      ctx.fillText(pad2(i) + ':00', x, PAD_T + plotH + 6 * DPR);
-    });
-  }
-
-  // ── Number counter animation ────────────
-  function animateNumber(node, target, opts) {
-    opts = opts || {};
-    const duration = opts.duration || 1200;
-    const fmt = opts.fmt || (n => Math.round(n).toLocaleString());
-    const start = performance.now();
-    (function step(now) {
-      const t = Math.min(1, (now - start) / duration);
-      const e = 1 - Math.pow(1 - t, 3);
-      node.textContent = fmt(target * e);
-      if (t < 1) requestAnimationFrame(step);
-    })(start);
-  }
-
-  // ── Poll loop ───────────────────────────
-  async function poll() {
-    // status
-    try {
-      const s = await fetch('/api/status').then(r => r.json());
-      const st = el('streamStatus');
-      st.replaceChildren();
-      const dot = document.createElement('span'); dot.className = 'dot';
-      const text = document.createTextNode(s.healthy ? 'ON AIR' : 'OFF AIR');
-      if (!s.healthy) { dot.style.background = 'var(--stop)'; dot.style.boxShadow = '0 0 10px var(--stop)'; }
-      st.append(dot, text);
-      st.style.color = s.healthy ? 'var(--tungsten)' : 'var(--stop)';
-      if (s.healthy) {
-        el('streamRes').textContent = s.width + '×' + s.height + ' · ' + s.fps + ' fps';
-        el('streamMeta').textContent = 'RTSP · ' + (s.codec || 'h264').toUpperCase()
-                                       + ' · ' + s.width + '×' + s.height + ' · ' + s.fps + ' fps';
-      }
-    } catch (e) {}
-
-    // counts
-    try {
-      const c = await fetch('/api/counts').then(r => r.json());
-      drawChart(c);
-      el('chartDate').textContent = c.date || '—';
-      el('chartDet').textContent  = String(c.detectors || 0);
-      el('chartTot').textContent  = (c.total || 0).toLocaleString();
-      el('chartMeta').textContent = (c.date || '—') + ' · 24 h';
-
-      if (!el('hTotal').dataset.done) {
-        animateNumber(el('hTotal'), c.total || 0);
-        el('hTotal').dataset.done = '1';
-      } else {
-        el('hTotal').textContent = (c.total || 0).toLocaleString();
-      }
-      if (c.hourly && c.hourly.length) {
-        const pk = Math.max(...c.hourly);
-        const pkIdx = c.hourly.indexOf(pk);
-        el('hPeak').textContent = pk.toLocaleString();
-        el('hPeakHour').textContent = pad2(pkIdx) + ':00';
-      }
-    } catch (e) {}
-
-    // signal events
-    let signalLines = [];
-    try {
-      const ev = await fetch('/api/events').then(r => r.json());
-      signalLines = ev.lines || [];
-      renderSignalLog(signalLines);
-      let latest = null;
-      for (let i = signalLines.length - 1; i >= 0; i--) {
-        const o = safeJson(signalLines[i]);
-        if (o && o.phase != null) { latest = o; break; }
-      }
-      if (latest) {
-        renderPhaseRing(latest.phase, latest.state);
-        el('hPhase').textContent = String(latest.phase);
-        el('hPhaseState').textContent = { GREEN_ON: 'GREEN', YELLOW_ON: 'AMBER', RED_ON: 'RED' }[latest.state] || '—';
-      }
-    } catch (e) {}
-
-    // phase 2 events
-    let p2Lines = [];
-    try {
-      const p2data = await fetch('/api/phase2').then(r => r.json());
-      p2Lines = p2data.lines || [];
-      renderPhase2Log(p2Lines);
-      let tracks = null, p50 = null;
-      for (let i = p2Lines.length - 1; i >= 0; i--) {
-        const o = safeJson(p2Lines[i]); if (!o) continue;
-        if (o.event_type === 'run_end') {
-          tracks = o.unique_tracks;
-          p50 = o.latency_ms && o.latency_ms.p50;
-          break;
-        }
-      }
-      if (tracks != null && !el('hActive').dataset.done) {
-        animateNumber(el('hActive'), tracks); el('hActive').dataset.done = '1';
-      } else if (tracks != null) {
-        el('hActive').textContent = tracks.toLocaleString();
-      }
-      if (p50 != null) el('hFps').textContent = p50;
-    } catch (e) {}
-
-    renderWire(signalLines, p2Lines);
-  }
-  poll(); setInterval(poll, 4000);
- </script>
+    if (p50 != null) el('hFps').textContent = p50;
+  } catch(_) {}
+}
+poll(); setInterval(poll, 4000);
+</script>
 </body></html>
 """
-
-
 def _thumb_refresher(rtsp_url: str, stop: threading.Event) -> None:
     ffmpeg = shutil.which("ffmpeg")
     if not ffmpeg:
@@ -1045,6 +1212,21 @@ def _latest_phase2(limit: int = 10) -> dict:
     return {"lines": [ln.rstrip() for ln in lines[-limit:]]}
 
 
+def _latest_forecast() -> dict:
+    """Read the full-day traffic forecast (48 slots × 4 approaches) written by
+    `make forecast-predict`. Empty response if the file is missing."""
+    path = DATA_DIR / "forecast" / "forecast_day.json"
+    if not path.is_file():
+        return {"available": False,
+                "message": "run `make forecast-all` to produce a forecast"}
+    try:
+        data = json.loads(path.read_text())
+        data["available"] = True
+        return data
+    except (OSError, json.JSONDecodeError) as exc:
+        return {"available": False, "message": f"forecast read failed: {exc}"}
+
+
 def _healthy(rtsp_url: str) -> dict:
     try:
         from traffic_intel_sandbox.rtsp_sim.healthcheck import _probe, evaluate
@@ -1054,6 +1236,139 @@ def _healthy(rtsp_url: str) -> dict:
         return report
     except Exception as exc:  # noqa: BLE001
         return {"healthy": False, "error": str(exc)}
+
+
+_VIDEO_LABELS = {
+    # Long-form archival
+    "amman-wadi-saqra-gardens-brt.mp4": "Wadi Saqra · Gardens + BRT",
+    "amman-wadi-saqra-tour.mp4":        "Wadi Saqra · tour",
+    "amman-7th-circle-drive.mp4":       "7th Circle · dashcam",
+    # Short scenario clips (Veo3 generative)
+    "veo3-01-day-light.mp4":            "Veo3 · 01 day light",
+    "veo3-02-cctv-request.mp4":         "Veo3 · 02 cctv",
+    "veo3-03-car-view.mp4":             "Veo3 · 03 car view",
+    # AI-annotated scenario angles (each = a different incident angle)
+    "angle_a_gridlock_1419.mp4":           "Angle A · gridlock",
+    "angle_b_gridlock_1421.mp4":           "Angle B · gridlock",
+    "angle_c_suv_red_1419.mp4":            "Angle C · red runner",
+    "angle_d_motorcycle_wrongway_1418.mp4":"Angle D · wrong way",
+}
+
+
+def _find_normalized(name: str) -> Path | None:
+    """Look up a normalized MP4 by basename across known subdirs."""
+    for candidate in (DATA_DIR / "normalized" / name,
+                      DATA_DIR / "normalized" / "scenarios" / name):
+        if candidate.is_file():
+            return candidate
+    return None
+
+
+def _find_annotated(name: str) -> Path | None:
+    """Look up an AI-annotated MP4 by basename across known subdirs."""
+    for candidate in (DATA_DIR / "annotated" / "scenarios" / name,
+                      DATA_DIR / "annotated" / name):
+        if candidate.is_file():
+            return candidate
+    return None
+
+
+POSTER_DIR = Path("/tmp/traffic-intel-posters")
+ANIM_DIR   = Path("/tmp/traffic-intel-anim")
+
+
+def _ensure_animated_webp(video_path: Path, webp_path: Path, width: int = 960, fps: int = 10) -> bool:
+    """Convert an annotated MP4 to an animated WebP for browser-safe animation
+    (bypasses the broken H.264 decoder path on this VM)."""
+    if webp_path.exists() and webp_path.stat().st_size > 0:
+        return True
+    ffmpeg = shutil.which("ffmpeg")
+    if not ffmpeg:
+        return False
+    webp_path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        subprocess.run(
+            [ffmpeg, "-y", "-loglevel", "error",
+             "-i", str(video_path),
+             "-vf", f"fps={fps},scale={width}:-2:flags=bilinear",
+             "-loop", "0",
+             "-c:v", "libwebp", "-lossless", "0", "-q:v", "60",
+             "-preset", "default", "-an", "-vsync", "0",
+             str(webp_path)],
+            check=True, timeout=60,
+        )
+        return webp_path.exists() and webp_path.stat().st_size > 0
+    except Exception:
+        return False
+
+
+def _ensure_poster(video_path: Path, poster_path: Path, width: int = 1280) -> bool:
+    """Extract a JPEG frame from the middle of the video at full HD width, cache it."""
+    if poster_path.exists() and poster_path.stat().st_size > 0:
+        return True
+    ffmpeg = shutil.which("ffmpeg")
+    if not ffmpeg:
+        return False
+    poster_path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        # ~40% into the clip; pick a frame that's likely to have detections on it
+        subprocess.run(
+            [ffmpeg, "-y", "-loglevel", "error",
+             "-ss", "3", "-i", str(video_path),
+             "-frames:v", "1", "-vf", f"scale={width}:-2",
+             "-q:v", "3", str(poster_path)],
+            check=True, timeout=10,
+        )
+        return poster_path.exists() and poster_path.stat().st_size > 0
+    except Exception:
+        return False
+
+
+def _list_videos() -> list[dict]:
+    """Only videos that have an AI-annotated counterpart are exposed to the
+    dashboard. Posters are static JPEG snapshots for the mini strip (avoids
+    running 5 concurrent video decoders in Chromium-on-VM)."""
+    out: list[dict] = []
+    seen: set[str] = set()
+    search_dirs = [
+        (DATA_DIR / "normalized", "archive"),
+        (DATA_DIR / "normalized" / "scenarios", "angle"),
+    ]
+    for root, group in search_dirs:
+        if not root.is_dir():
+            continue
+        for p in sorted(root.glob("*.mp4")):
+            name = p.name
+            if name in seen:
+                continue
+            ai = _find_annotated(name)
+            if not ai:
+                continue
+            seen.add(name)
+            stem = Path(name).stem
+            # AI (annotated) + RAW posters/anims — give AI OFF a truly box-free view.
+            ai_poster  = POSTER_DIR / f"{stem}.ai.jpg"
+            raw_poster = POSTER_DIR / f"{stem}.raw.jpg"
+            ai_anim    = ANIM_DIR   / f"{stem}.ai.webp"
+            raw_anim   = ANIM_DIR   / f"{stem}.raw.webp"
+            has_ai_poster  = _ensure_poster(ai, ai_poster)
+            has_raw_poster = _ensure_poster(p,  raw_poster)
+            has_ai_anim    = _ensure_animated_webp(ai, ai_anim)
+            has_raw_anim   = _ensure_animated_webp(p,  raw_anim)
+            out.append({
+                "name":            name,
+                "label":           _VIDEO_LABELS.get(name, name),
+                "group":           group,
+                "size":            p.stat().st_size,
+                "url":             f"/video/{name}",
+                "ai_url":          f"/video-ai/{name}",
+                "poster_url":      f"/poster/{stem}.ai.jpg"   if has_ai_poster  else None,
+                "raw_poster_url":  f"/poster/{stem}.raw.jpg"  if has_raw_poster else None,
+                "anim_url":        f"/animated/{stem}.ai.webp"  if has_ai_anim  else None,
+                "raw_anim_url":    f"/animated/{stem}.raw.webp" if has_raw_anim else None,
+                "has_ai":          True,
+            })
+    return out
 
 
 def _handler(rtsp_url: str):
@@ -1083,6 +1398,18 @@ def _handler(rtsp_url: str):
                     self.wfile.write(THUMB_PATH.read_bytes())
                 else:
                     self.send_response(503); self.end_headers()
+            elif path == "/ai-thumb.jpg":
+                # Phase 2 annotated snapshot — poll-based replacement for MJPEG
+                # multipart stream (which SIGILLs Chromium inside this VM).
+                p = Path("/tmp/traffic-intel-phase2-latest.jpg")
+                if p.is_file():
+                    self.send_response(200)
+                    self.send_header("Content-Type", "image/jpeg")
+                    self.send_header("Cache-Control", "no-store")
+                    self.end_headers()
+                    self.wfile.write(p.read_bytes())
+                else:
+                    self.send_response(503); self.end_headers()
             elif path == "/api/status":
                 self._json(_healthy(rtsp_url))
             elif path == "/api/counts":
@@ -1091,8 +1418,89 @@ def _handler(rtsp_url: str):
                 self._json(_latest_events())
             elif path == "/api/phase2":
                 self._json(_latest_phase2())
+            elif path == "/api/forecast":
+                self._json(_latest_forecast())
+            elif path == "/api/videos":
+                self._json({"videos": _list_videos()})
+            elif path.startswith("/poster/"):
+                name = Path(path[len("/poster/"):]).name
+                p = POSTER_DIR / name
+                if p.is_file() and p.suffix.lower() in (".jpg", ".jpeg"):
+                    self.send_response(200)
+                    self.send_header("Content-Type", "image/jpeg")
+                    self.send_header("Cache-Control", "public, max-age=86400")
+                    self.end_headers()
+                    self.wfile.write(p.read_bytes())
+                else:
+                    self.send_response(404); self.end_headers()
+            elif path.startswith("/animated/"):
+                name = Path(path[len("/animated/"):]).name
+                p = ANIM_DIR / name
+                if p.is_file() and p.suffix.lower() == ".webp":
+                    self.send_response(200)
+                    self.send_header("Content-Type", "image/webp")
+                    self.send_header("Cache-Control", "public, max-age=3600")
+                    self.send_header("Content-Length", str(p.stat().st_size))
+                    self.end_headers()
+                    self.wfile.write(p.read_bytes())
+                else:
+                    self.send_response(404); self.end_headers()
+            elif path.startswith("/video/"):
+                self._serve_video(path[len("/video/"):], kind="raw")
+            elif path.startswith("/video-ai/"):
+                self._serve_video(path[len("/video-ai/"):], kind="ai")
             else:
                 self.send_response(404); self.end_headers()
+
+        def _serve_video(self, name: str, kind: str = "raw") -> None:
+            # Sanitize — only allow plain filenames; block traversal
+            safe = Path(name).name
+            if not safe or safe != name:
+                self.send_response(400); self.end_headers(); return
+            full = _find_annotated(safe) if kind == "ai" else _find_normalized(safe)
+            if not full or not full.is_file() or full.suffix.lower() != ".mp4":
+                self.send_response(404); self.end_headers(); return
+            size = full.stat().st_size
+            rng = self.headers.get("Range", "")
+            start, end = 0, size - 1
+            if rng.startswith("bytes="):
+                try:
+                    s, _, e = rng[6:].partition("-")
+                    start = int(s) if s else 0
+                    end = int(e) if e else size - 1
+                    if start < 0 or end >= size or start > end:
+                        raise ValueError
+                except Exception:
+                    self.send_response(416)
+                    self.send_header("Content-Range", f"bytes */{size}")
+                    self.end_headers(); return
+            length = end - start + 1
+            code = 206 if rng else 200
+            self.send_response(code)
+            # Advertise the exact AVC1 codec string for H.264 Constrained
+            # Baseline, level 3.1 (avc1.42E01F). All MP4s under data/normalized
+            # and data/annotated are transcoded to this profile so Chrome in
+            # this VirtualBox VM takes the software-decode path unconditionally
+            # and avoids the VA-API/virtio-GPU SIGILL seen with High profile
+            # + B-frames (and with MPEG-4 Part 2, which Chrome cannot decode).
+            self.send_header("Content-Type", 'video/mp4; codecs="avc1.42E01F"')
+            self.send_header("Accept-Ranges", "bytes")
+            self.send_header("Content-Length", str(length))
+            if code == 206:
+                self.send_header("Content-Range", f"bytes {start}-{end}/{size}")
+            self.send_header("Cache-Control", "public, max-age=3600")
+            self.end_headers()
+            with full.open("rb") as fh:
+                fh.seek(start)
+                remaining = length
+                while remaining > 0:
+                    chunk = fh.read(min(1 << 20, remaining))
+                    if not chunk: break
+                    try:
+                        self.wfile.write(chunk)
+                    except (BrokenPipeError, ConnectionResetError):
+                        return
+                    remaining -= len(chunk)
     return H
 
 

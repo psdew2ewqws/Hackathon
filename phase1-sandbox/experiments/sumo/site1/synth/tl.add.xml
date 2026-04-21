@@ -1,0 +1,17 @@
+<?xml version='1.0' encoding='utf-8'?>
+<additional>
+  <tlLogic id="site1_center" type="static" programID="site1_static" offset="0">
+    <phase duration="35" state="GGGGrrrrrGGGGrrrrr" name="2_green" />
+    <phase duration="3" state="yyyyrrrrryyyyrrrrr" name="2_yellow" />
+    <phase duration="2" state="rrrrrrrrrrrrrrrrrr" name="2_allred" />
+    <phase duration="15" state="rrrrGrrrrrrrrGrrrr" name="6_green" />
+    <phase duration="3" state="rrrryrrrrrrrryrrrr" name="6_yellow" />
+    <phase duration="2" state="rrrrrrrrrrrrrrrrrr" name="6_allred" />
+    <phase duration="22" state="rrrrrGGGrrrrrrGGGr" name="4_green" />
+    <phase duration="3" state="rrrrryyyrrrrrryyyr" name="4_yellow" />
+    <phase duration="2" state="rrrrrrrrrrrrrrrrrr" name="4_allred" />
+    <phase duration="10" state="rrrrrrrrGrrrrrrrrG" name="8_green" />
+    <phase duration="3" state="rrrrrrrryrrrrrrrry" name="8_yellow" />
+    <phase duration="2" state="rrrrrrrrrrrrrrrrrr" name="8_allred" />
+  </tlLogic>
+</additional>

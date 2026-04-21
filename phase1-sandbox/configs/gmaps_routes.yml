@@ -1,0 +1,52 @@
+# Google Maps Routes API — monitored corridors around the Phase 1 target
+# intersection in Amman.
+#
+# Each corridor is a ~500-m segment with one endpoint AT the target center
+# and the other offset one compass direction. The Routes API snaps these
+# lat/lon pairs to the closest real street, so N/S/E/W labels refer to the
+# direction traffic approaches FROM (destination is the center).
+#
+# One approx-degree at this latitude: lat ≈ 111 km; lon ≈ cos(31.97°)·111 ≈ 94 km.
+# 250-m offset → 250 / 111000 = 0.00225 lat ; 250 / 94000 = 0.00266 lon.
+#
+# Limit of this monitoring strategy: Google Routes API returns one travel-time
+# per route, not per lane. Per-lane granularity would require YOLO26 (camera)
+# or a per-lane traffic provider (TomTom/HERE). The 4 corridors below are the
+# finest granularity Google exposes — per compass approach to the center.
+#
+# Keep the center + offset explicit so it's obvious what's being polled.
+
+site_id:   SITE-GMAPS
+site_name: "Amman · Gmaps-monitored intersection"
+center:
+  lat: 31.96686
+  lon: 35.88704
+
+# Offset in degrees for a 250-m corridor at this latitude
+offset:
+  lat_250m: 0.00225
+  lon_250m: 0.00266
+
+# Each corridor records traffic arriving AT `center` FROM the listed bearing.
+# The Google Routes API will route along whatever real streets lie between
+# origin and destination; we just need lat/lon to be on a drivable road.
+corridors:
+  - id: N
+    bearing_deg: 0
+    origin:      { lat: 31.96911, lon: 35.88704 }
+    destination: { lat: 31.96686, lon: 35.88704 }
+
+  - id: S
+    bearing_deg: 180
+    origin:      { lat: 31.96461, lon: 35.88704 }
+    destination: { lat: 31.96686, lon: 35.88704 }
+
+  - id: E
+    bearing_deg: 90
+    origin:      { lat: 31.96686, lon: 35.88970 }
+    destination: { lat: 31.96686, lon: 35.88704 }
+
+  - id: W
+    bearing_deg: 270
+    origin:      { lat: 31.96686, lon: 35.88438 }
+    destination: { lat: 31.96686, lon: 35.88704 }

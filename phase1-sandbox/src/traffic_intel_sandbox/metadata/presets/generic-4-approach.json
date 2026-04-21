@@ -1,0 +1,38 @@
+{
+  "id": "generic-4-approach",
+  "label": "Generic 4-approach intersection (notional)",
+  "description": "Placeholder geometry for a notional 1920×1080 camera — use as a starting point and drag the corners to match your actual camera view.",
+  "frame_ref": {
+    "width": 1920,
+    "height": 1080,
+    "source_video": null
+  },
+  "stop_lines": [
+    { "approach": "N", "polyline_px": [[400, 620], [1520, 620]] },
+    { "approach": "S", "polyline_px": [[400, 460], [1520, 460]] },
+    { "approach": "E", "polyline_px": [[1100, 300], [1100, 780]] },
+    { "approach": "W", "polyline_px": [[820,  300], [820,  780]] }
+  ],
+  "monitoring_zones": [
+    {
+      "name": "queue_spillback_N",
+      "kind": "queue_spillback",
+      "polygon_px": [[400, 620], [1520, 620], [1520, 900], [400, 900]]
+    },
+    {
+      "name": "queue_spillback_S",
+      "kind": "queue_spillback",
+      "polygon_px": [[400, 180], [1520, 180], [1520, 460], [400, 460]]
+    },
+    {
+      "name": "conflict_zone_center",
+      "kind": "conflict_zone",
+      "polygon_px": [[820, 460], [1100, 460], [1100, 620], [820, 620]]
+    },
+    {
+      "name": "ped_crossing_center",
+      "kind": "ped_crossing",
+      "polygon_px": [[820, 600], [1100, 600], [1100, 640], [820, 640]]
+    }
+  ]
+}

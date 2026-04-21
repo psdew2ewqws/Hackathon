@@ -1,0 +1,48 @@
+{
+  "id": "wadi-saqra-gardens-brt",
+  "label": "Wadi Saqra · Gardens + BRT (elevated)",
+  "description": "Elevated view of Wadi Saqra intersection at King Abdullah I Gardens, BRT line visible. Tuned to the 1920×1080 normalized feed of amman-wadi-saqra-gardens-brt.mp4.",
+  "frame_ref": {
+    "width": 1920,
+    "height": 1080,
+    "source_video": "data/normalized/amman-wadi-saqra-gardens-brt.mp4"
+  },
+  "stop_lines": [
+    { "approach": "N", "polyline_px": [[620, 540], [1020, 540]] },
+    { "approach": "S", "polyline_px": [[780, 780], [1140, 780]] },
+    { "approach": "E", "polyline_px": [[1360, 620], [1360, 780]] },
+    { "approach": "W", "polyline_px": [[460, 620], [460, 780]] }
+  ],
+  "monitoring_zones": [
+    {
+      "name": "queue_spillback_N",
+      "kind": "queue_spillback",
+      "polygon_px": [[620, 400], [1020, 400], [1020, 540], [620, 540]]
+    },
+    {
+      "name": "queue_spillback_S",
+      "kind": "queue_spillback",
+      "polygon_px": [[780, 780], [1140, 780], [1140, 960], [780, 960]]
+    },
+    {
+      "name": "queue_spillback_E",
+      "kind": "queue_spillback",
+      "polygon_px": [[1360, 620], [1620, 620], [1620, 780], [1360, 780]]
+    },
+    {
+      "name": "queue_spillback_W",
+      "kind": "queue_spillback",
+      "polygon_px": [[200, 620], [460, 620], [460, 780], [200, 780]]
+    },
+    {
+      "name": "conflict_zone_center",
+      "kind": "conflict_zone",
+      "polygon_px": [[620, 560], [1140, 560], [1360, 620], [1360, 780], [780, 780], [460, 780], [460, 620]]
+    },
+    {
+      "name": "ped_crossing_center",
+      "kind": "ped_crossing",
+      "polygon_px": [[820, 640], [1080, 640], [1080, 700], [820, 700]]
+    }
+  ]
+}

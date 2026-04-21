@@ -1,0 +1,40 @@
+{
+  "intersection_id": "ANGLE_A",
+  "location": {
+    "city": "Synthetic",
+    "country": "Veo3"
+  },
+  "camera": {
+    "stream_url": "file:///data/normalized/scenarios/angle_a_gridlock_1419.mp4",
+    "resolution": [1920, 1080],
+    "fps": 10,
+    "fov_deg": 90
+  },
+  "approaches": [
+    {
+      "name": "N",
+      "direction_bearing_deg": 180,
+      "lanes": [
+        { "id": "N-1", "type": "through", "width_m": 3.5 }
+      ]
+    }
+  ],
+  "stop_lines": [
+    {
+      "approach": "N",
+      "polyline_px": [[960, 600], [960, 1000]]
+    }
+  ],
+  "monitoring_zones": [
+    {
+      "name": "queue_spillback_N",
+      "kind": "queue_spillback",
+      "polygon_px": [
+        [960, 600],
+        [1260, 600],
+        [1260, 900],
+        [960, 900]
+      ]
+    }
+  ]
+}

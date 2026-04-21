@@ -47,9 +47,52 @@ The sandbox imitates the operating environment of a single representative inters
 ### 3.4 Intersection metadata
 
 - The JSON Schema (draft 2020-12) covers everything downstream needs: camera pose, approach/lane definitions, stop-line polylines, monitoring-zone polygons.
-- `site1.example.json` is a stubbed instance with placeholder coordinates (`lat: 0, lon: 0`). The user edits it when the actual site is chosen; the validator gates Phase 2 on schema validity.
+- `site1.example.json` is populated with approximate Wadi Saqra / King Abdullah I Gardens reference coordinates (`lat: 31.9583, lon: 35.9072`) — *approximate, reference only*. Exact survey coordinates are substituted once an operational site is chosen; the validator gates Phase 2 on schema validity independent of coordinate precision.
+- Stop-line polylines and monitoring-zone polygons are drawn against the normalised 1920×1080 frame of `data/normalized/amman-wadi-saqra-gardens-brt.mp4` (the same preset shipped under `metadata/presets/wadi-saqra-gardens-brt.json`). The browser calibration tool at `/calibrate` reuses the preset as a starting point and supports drag-to-adjust for any future camera angle.
 
-### 3.5 Annotation
+### 3.5 SUMO microscopic coupled scenario
+
+*Wired up 2026-04-21.* The research pipeline at `phase1-sandbox/experiments/`
+now drives a real Eclipse SUMO simulation that emits byte-compatible outputs
+for `synth.detector_counts` (parquet), `synth.signal_logs` (ndjson), and a
+new `trajectories_<date>.parquet` (per-vehicle pose for the compose stage).
+
+Provenance of each SUMO input:
+
+| SUMO input | Origin | Generator |
+|---|---|---|
+| `net.net.xml` — road network | Hand-authored 4-way matching `site1.example.json` (5-lane N/S, 4-lane E/W) | `experiments/sumo/site1/build_site1_network.py` |
+| `tl.add.xml` — traffic light logic | `phase_plan.yml` NEMA plan (102 s cycle, phases 2/6/4/8) | `experiments/sumo/site1/build_site1_tllogic.py` |
+| `routes.rou.xml` — demand | Aggregated `stop_line_crossing` events from `data/events/phase2.ndjson` (observed veh/hr per approach), split across turns by each approach's lane-type mix | `experiments/sumo/site1/build_site1_routes.py` |
+| `detectors.add.xml` — 22 induction loops | Lane mapping from `profiles.yml`, IDs preserved (DET-*) | `experiments/sumo/site1/build_site1_detectors.py` |
+
+The OSM-pulled Wadi Saqra area (≈ 2.5 km² around 31.96°N 35.91°E, 22 real
+tagged traffic signals, 4.6 MB osm.xml) is persisted alongside the synth
+network at `experiments/sumo/site1/build/` as regional context. It is *not*
+currently fed into the simulation — its real-world geometry is skewed and
+cluster-based rather than the cardinal 4-way schema the rest of the
+pipeline encodes (`site1.example.json`, `profiles.yml`, phase-2 zone
+polygons). Reserved for future multi-site promotion.
+
+**Analytic fallback** (`--analytic`) uses the original cell-transmission
+flow model (per-minute Poisson arrivals + queue + saturation-flow
+discharge) and remains a supported mode for environments without SUMO. Both
+modes share the exact same output schemas so downstream consumers
+(`04_compose_synthetic_video.py`, Phase 3 forecasting) are unaware which
+simulator produced the data.
+
+**Precedent for SUMO-generated traffic data in Amman:** Al-Mousa, Alqudah,
+Faza (Princess Sumaya University for Technology, Amman) published the
+**SimToll** dataset in 2022 — 90 SUMO-generated highway scenarios covering
+lane-choice, toll pricing, and carpool behaviour. While SimToll is a 5-lane
+highway and cannot directly seed our 4-way intersection, it validates the
+core methodological choice of this document: SUMO microscopic simulation
+is an accepted approach for producing realistic supplementary traffic data
+in the Amman context when real operational feeds are unavailable. SimToll
+itself is reserved as an external validation benchmark for Phase 3
+forecasting.
+
+### 3.6 Annotation
 
 - CVAT 2.x (latest) is stood up via `docker-compose --profile annotation`.
 - Taxonomy is fixed up-front in `annotation/taxonomy.yml`: 6 object classes (COCO subset) + 6 event-window tags (handbook §6.6).
@@ -79,6 +122,9 @@ The sandbox imitates the operating environment of a single representative inters
 | pytest | ≥ 8.0 | MIT | Verification suite |
 | Ultralytics YOLO26 | (Phase 2+) | AGPL-3.0 | Detection + tracking |
 | roboflow/supervision | (Phase 2+) | MIT | Line/zone counting & overlays |
+| Eclipse SUMO | 1.18 | EPL-2.0 | Microscopic traffic simulator (experiments/03) |
+| sumolib / traci | ≥ 1.18 | EPL-2.0 | Python bindings + TraCI runtime control |
+| pyproj | ≥ 3.7 | MIT | Lat/lon ↔ projected-xy conversion for sumolib |
 
 ## 6. Reproducibility claim
 

@@ -32,3 +32,12 @@ sources:
       7th Circle & Al Rawnaq 4K sunny-day drive-through during Ramadan.
       20 min, 4K. Dashcam drive; extract stop-at-red-light segments downstream.
     tags: [amman, 7th-circle, dashcam, 4k, needs-stationary-extract]
+
+  - slug: amman-wadi-saqra-gardens-brt
+    url: https://www.youtube.com/watch?v=52ao3WsInBo
+    description: >-
+      Elevated view of Wadi Saqra intersection, King Abdullah I Gardens, and
+      the BRT (bus rapid transit) line. Second angle of the same target
+      intersection as amman-wadi-saqra-tour — strengthens the visual domain
+      anchor for the sim-to-real compositing pipeline.
+    tags: [amman, wadi-saqra, elevated, brt, domain-anchor]

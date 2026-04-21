@@ -46,18 +46,43 @@ def _probe_duration_sec(path: Path) -> float:
 
 
 def _cut(src: Path, start_s: float, seconds: int, dst: Path) -> None:
-    cmd = [
+    """Cut [start_s, start_s+seconds) from src to dst.
+
+    Preferred path: ``-c copy`` (fast, no re-encode). Falls back to
+    a full re-encode if copy fails — happens when the requested start
+    is not aligned with a source keyframe and the MP4 muxer can't
+    finalize.
+    """
+    copy_cmd = [
         _ffmpeg_bin(),
-        "-y",
-        "-loglevel", "error",
+        "-y", "-loglevel", "error",
         "-ss", f"{start_s:.3f}",
         "-i", str(src),
         "-t", str(seconds),
         "-c", "copy",
+        "-avoid_negative_ts", "make_zero",
         "-movflags", "+faststart",
         str(dst),
     ]
-    subprocess.run(cmd, check=True)
+    res = subprocess.run(copy_cmd, capture_output=True, text=True)
+    if res.returncode == 0:
+        return
+    # Fallback: re-encode. Slower but always works.
+    if dst.exists():
+        dst.unlink()
+    reencode_cmd = [
+        _ffmpeg_bin(),
+        "-y", "-loglevel", "error",
+        "-ss", f"{start_s:.3f}",
+        "-i", str(src),
+        "-t", str(seconds),
+        "-c:v", "libx264", "-preset", "veryfast", "-crf", "23",
+        "-pix_fmt", "yuv420p",
+        "-an",
+        "-movflags", "+faststart",
+        str(dst),
+    ]
+    subprocess.run(reencode_cmd, check=True)
 
 
 def build_pack(

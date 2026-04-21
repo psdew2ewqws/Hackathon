@@ -1,0 +1,40 @@
+{
+  "intersection_id": "ANGLE_D",
+  "location": {
+    "city": "Synthetic",
+    "country": "Veo3"
+  },
+  "camera": {
+    "stream_url": "file:///data/normalized/scenarios/angle_d_motorcycle_wrongway_1418.mp4",
+    "resolution": [1920, 1080],
+    "fps": 10,
+    "fov_deg": 90
+  },
+  "approaches": [
+    {
+      "name": "N",
+      "direction_bearing_deg": 180,
+      "lanes": [
+        { "id": "N-1", "type": "through", "width_m": 3.5 }
+      ]
+    }
+  ],
+  "stop_lines": [
+    {
+      "approach": "N",
+      "polyline_px": [[200, 720], [1720, 720]]
+    }
+  ],
+  "monitoring_zones": [
+    {
+      "name": "queue_spillback_N",
+      "kind": "queue_spillback",
+      "polygon_px": [
+        [760, 540],
+        [1060, 540],
+        [1060, 720],
+        [760, 720]
+      ]
+    }
+  ]
+}
