@@ -1,0 +1,56 @@
+{
+  "elapsed_s": 707.4,
+  "n_train": 38790,
+  "n_val": 9698,
+  "n_features": 12,
+  "feature_cols": [
+    "lag_1",
+    "lag_2",
+    "lag_4",
+    "lag_96",
+    "lag_672",
+    "hour_sin",
+    "hour_cos",
+    "dow_sin",
+    "dow_cos",
+    "is_weekend",
+    "green_active_frac",
+    "detector_code"
+  ],
+  "target_cols": [
+    "y_now",
+    "y_15min",
+    "y_30min",
+    "y_60min"
+  ],
+  "baseline_mae": {
+    "y_now": 12.189,
+    "y_15min": 19.989,
+    "y_30min": 27.857,
+    "y_60min": 41.816
+  },
+  "lightgbm": {
+    "y_now": {
+      "mae": 6.283,
+      "best_iteration": 300
+    },
+    "y_15min": {
+      "mae": 6.36,
+      "best_iteration": 300
+    },
+    "y_30min": {
+      "mae": 6.247,
+      "best_iteration": 300
+    },
+    "y_60min": {
+      "mae": 6.105,
+      "best_iteration": 300
+    }
+  },
+  "lstm": {
+    "skipped": true
+  },
+  "lgb_path": "models/forecast_lgb.json",
+  "lstm_path": "models/forecast_lstm.pt",
+  "trained_at": "2026-04-21T22:33:04.639223+00:00"
+}

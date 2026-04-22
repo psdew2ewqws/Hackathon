@@ -1,0 +1,339 @@
+.page {
+  max-width: 1480px;
+  margin: 0 auto;
+  padding: 28px 32px 56px;
+  position: relative;
+}
+.page::before {
+  content: '';
+  position: fixed;
+  inset: 0 0 auto 0;
+  height: 320px;
+  background: radial-gradient(
+    ellipse 900px 320px at 50% 0%,
+    rgba(232, 180, 100, 0.025),
+    transparent 70%
+  );
+  pointer-events: none;
+  z-index: 0;
+}
+
+.topbar {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 28px;
+  padding: 6px 0 24px;
+  margin-bottom: 28px;
+  border-bottom: 1px solid var(--border-soft);
+  position: relative;
+  z-index: 1;
+}
+.brand {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+}
+.brandLogo {
+  width: 22px;
+  height: 22px;
+  position: relative;
+}
+.brandLogo::before,
+.brandLogo::after {
+  content: '';
+  position: absolute;
+  background: var(--accent);
+  border-radius: 2px;
+}
+.brandLogo::before {
+  inset: 0 auto auto 0;
+  width: 22px;
+  height: 6px;
+}
+.brandLogo::after {
+  inset: 9px 0 9px auto;
+  width: 6px;
+  height: 4px;
+  background: var(--fg-dim);
+}
+.brandTitle {
+  font-weight: 600;
+  font-size: 15px;
+  letter-spacing: -0.01em;
+  color: var(--fg);
+  margin: 0;
+}
+.sep {
+  color: var(--fg-mute);
+  margin: 0 8px;
+  font-weight: 400;
+}
+.site {
+  color: var(--fg-dim);
+  font-weight: 400;
+}
+
+.backLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font: 500 12px var(--mono);
+  color: var(--fg-dim);
+  letter-spacing: 0.02em;
+  padding: 6px 12px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--border);
+}
+.backLink:hover {
+  color: var(--fg);
+  background: var(--hover);
+  text-decoration: none;
+}
+
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: 20px 22px;
+  position: relative;
+  z-index: 1;
+}
+.panel + .panel {
+  margin-top: 20px;
+}
+
+.panelHead {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 18px;
+  align-items: baseline;
+  margin-bottom: 18px;
+}
+.panelTitle {
+  font-weight: 500;
+  font-size: 13px;
+  color: var(--fg);
+  letter-spacing: -0.005em;
+  margin: 0 0 6px;
+}
+.panelBasis {
+  font: 400 11px var(--mono);
+  color: var(--fg-faint);
+  line-height: 1.7;
+}
+.panelBasis b {
+  color: var(--fg-dim);
+  font-weight: 500;
+}
+.panelHint {
+  font: 500 11px var(--mono);
+  color: var(--fg-faint);
+  letter-spacing: 0.02em;
+}
+
+.sliderWrap {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  margin-bottom: 18px;
+  background: var(--surface-2);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--r-md);
+}
+.sliderWrap label {
+  font: 500 11px var(--mono);
+  color: var(--fg-faint);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.sliderWrap input[type='range'] {
+  flex: 1;
+  accent-color: var(--accent);
+  height: 4px;
+}
+.sliderNow {
+  font: 600 16px var(--mono);
+  color: var(--accent);
+  min-width: 60px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.phaseGrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+@media (max-width: 1100px) {
+  .phaseGrid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.phase {
+  position: relative;
+  padding: 16px 16px 14px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  transition: border-color 0.15s;
+}
+.phaseTag {
+  font: 500 10px var(--mono);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--fg-faint);
+}
+.phaseName {
+  color: var(--fg);
+  font-size: 12px;
+  margin-top: 4px;
+}
+.phaseSlider {
+  width: 100%;
+  accent-color: var(--accent);
+  height: 4px;
+  margin: 10px 0 6px;
+}
+.gVal {
+  font: 600 22px var(--mono);
+  color: var(--fg);
+  font-variant-numeric: tabular-nums;
+}
+.gValUnit {
+  font-size: 12px;
+  color: var(--fg-faint);
+  font-weight: 400;
+  margin-left: 3px;
+}
+.phaseStats {
+  font: 400 11px var(--mono);
+  color: var(--fg-dim);
+  margin-top: 6px;
+  line-height: 1.7;
+}
+.phaseStats .k {
+  color: var(--fg-faint);
+  margin-right: 6px;
+}
+
+.sigGreen {
+  border-color: rgba(127, 168, 137, 0.45);
+}
+.sigGreen .gVal {
+  color: var(--good);
+}
+.sigYellow {
+  border-color: rgba(232, 180, 100, 0.55);
+}
+.sigYellow .gVal {
+  color: var(--accent);
+}
+.sigRed {
+  border-color: rgba(228, 111, 111, 0.55);
+}
+.sigRed .gVal {
+  color: var(--bad);
+}
+
+.toolbar {
+  margin-top: 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 12px 14px;
+  background: var(--surface-2);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--r-md);
+  font: 500 11px var(--mono);
+  color: var(--fg-dim);
+}
+.toolbar .stat {
+  letter-spacing: 0.05em;
+}
+.toolbar .stat b {
+  color: var(--fg);
+  font-weight: 600;
+}
+.toolbar button {
+  font: 500 11px var(--mono);
+  letter-spacing: 0.05em;
+  padding: 7px 14px;
+  background: var(--accent-ghost);
+  border: 1px solid rgba(232, 180, 100, 0.35);
+  color: var(--accent);
+  border-radius: 999px;
+  transition: background 0.15s;
+}
+.toolbar button:hover {
+  background: rgba(232, 180, 100, 0.18);
+}
+.toolbar button.ghost {
+  background: transparent;
+  color: var(--fg-dim);
+  border-color: var(--border);
+}
+.toolbar button.ghost:hover {
+  background: var(--hover);
+  color: var(--fg);
+}
+.pill {
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.pillGood {
+  color: var(--good);
+  border-color: rgba(127, 168, 137, 0.35);
+}
+.pillBad {
+  color: var(--bad);
+  border-color: rgba(228, 111, 111, 0.35);
+}
+
+.advice {
+  margin-top: 14px;
+  padding: 10px 14px;
+  background: var(--surface);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--r-sm);
+  font: 400 12px var(--mono);
+  color: var(--fg-dim);
+  line-height: 1.7;
+}
+.advice b {
+  color: var(--fg);
+  font-weight: 500;
+}
+.advice ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.advice li {
+  padding-left: 18px;
+  position: relative;
+}
+.advice li::before {
+  content: '▸';
+  position: absolute;
+  left: 0;
+  top: 1px;
+  color: var(--accent);
+}
+
+.footer {
+  margin-top: 40px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border-soft);
+  font: 400 11px var(--mono);
+  color: var(--fg-faint);
+  letter-spacing: 0.01em;
+}

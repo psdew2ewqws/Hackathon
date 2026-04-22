@@ -1,0 +1,73 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "traffic-intel://schemas/incident_event",
+  "title": "IncidentEvent",
+  "description": "Phase 2 §7.3 live incident event emitted by the YOLO/ByteTrack pipeline. Union of the event types that detect_track.py writes to phase2.ndjson.",
+  "type": "object",
+  "required": ["timestamp", "intersection_id", "event_type"],
+  "properties": {
+    "timestamp":       {"type": "string", "format": "date-time"},
+    "intersection_id": {"type": "string", "pattern": "^[A-Z0-9_-]{1,16}$"},
+    "event_type":      {"type": "string",
+                        "enum": ["run_start", "run_end",
+                                 "zone_occupancy", "stop_line_crossing",
+                                 "approach_occupancy", "lane_crossing"]}
+  },
+  "allOf": [
+    {
+      "if":   {"properties": {"event_type": {"const": "zone_occupancy"}}},
+      "then": {
+        "required": ["name", "kind", "count", "frame"],
+        "properties": {
+          "name":  {"type": "string"},
+          "kind":  {"type": "string",
+                    "enum": ["queue_spillback", "stop_line", "ped_crossing",
+                             "approach", "intersection_box", "conflict_zone"]},
+          "count": {"type": "integer", "minimum": 0},
+          "prev":  {"type": "integer", "minimum": 0},
+          "frame": {"type": "integer", "minimum": 0}
+        }
+      }
+    },
+    {
+      "if":   {"properties": {"event_type": {"const": "stop_line_crossing"}}},
+      "then": {
+        "required": ["approach", "delta", "frame"],
+        "properties": {
+          "approach":  {"type": "string", "enum": ["N", "S", "E", "W"]},
+          "delta":     {"type": "integer"},
+          "in_count":  {"type": "integer", "minimum": 0},
+          "out_count": {"type": "integer", "minimum": 0},
+          "frame":     {"type": "integer", "minimum": 0}
+        }
+      }
+    },
+    {
+      "if":   {"properties": {"event_type": {"const": "approach_occupancy"}}},
+      "then": {
+        "required": ["approach", "count", "frame"],
+        "properties": {
+          "approach": {"type": "string", "enum": ["N", "S", "E", "W"]},
+          "count":    {"type": "integer", "minimum": 0},
+          "frame":    {"type": "integer", "minimum": 0}
+        }
+      }
+    },
+    {
+      "if":   {"properties": {"event_type": {"const": "lane_crossing"}}},
+      "then": {
+        "required": ["approach", "delta", "frame"],
+        "properties": {
+          "approach":  {"type": "string", "enum": ["N", "S", "E", "W"]},
+          "lane_id":   {"type": "string"},
+          "lane_type": {"type": "string"},
+          "lane_idx":  {"type": "integer", "minimum": 0},
+          "delta":     {"type": "integer"},
+          "in_count":  {"type": "integer", "minimum": 0},
+          "out_count": {"type": "integer", "minimum": 0},
+          "frame":     {"type": "integer", "minimum": 0}
+        }
+      }
+    }
+  ]
+}

@@ -153,10 +153,10 @@ def signal_color(ratio: float | None) -> str:
 
 
 def label_for_ratio(ratio: float | None) -> str:
+    """4-band categorisation — free / light / heavy / jam (user spec)."""
     if ratio is None:           return "unknown"
-    if ratio < 1.15:            return "free"
-    if ratio < RATIO_YELLOW:    return "light"
-    if ratio < RATIO_RED:       return "moderate/heavy"
+    if ratio < RATIO_YELLOW:    return "light" if ratio >= 1.0 else "free"
+    if ratio < RATIO_RED:       return "heavy"
     return "jam"
 
 

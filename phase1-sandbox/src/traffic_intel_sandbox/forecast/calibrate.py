@@ -47,25 +47,43 @@ import numpy as np
 # Intersection core approximate bounds: x ∈ [400, 1500], y ∈ [280, 720].
 # Stop-lines are placed at the inner edges of that core, on the incoming side.
 
+# Zones tuned to land on actual roadway — off buildings, off parking lots.
+# Anchored on the visible intersection in the YouTube Amman CCTV clip:
+#   - Upper arterial (cars driving left→right across the top) = "N approach"
+#   - Lower arterial (cars driving right→left in the middle)  = "S approach"  (see note)
+#   - Incoming from the right foreground                      = "E approach"
+#   - Incoming from the left foreground                       = "W approach"
+# Note the cardinal labels are topological, not true compass — the intersection
+# is skewed and the handbook only requires the pipeline to be labeled
+# consistently, which is what these zones do.
+
 DEFAULTS_1920x1080 = {
     "stop_lines": [
-        {"approach": "N", "polyline_px": [[840, 260],  [1120, 260]]},
-        {"approach": "S", "polyline_px": [[740, 720],  [1140, 720]]},
-        {"approach": "E", "polyline_px": [[1500, 380], [1500, 560]]},
-        {"approach": "W", "polyline_px": [[420, 380],  [420, 560]]},
+        # Upper arterial: catch cars on the top road crossing L→R
+        {"approach": "N", "polyline_px": [[260, 290],  [900, 290]]},
+        # Lower arterial / foreground cross-street: near the bottom crosswalk
+        {"approach": "S", "polyline_px": [[380, 610],  [1020, 610]]},
+        # Right-side approach: cars coming in from the right foreground
+        {"approach": "E", "polyline_px": [[980, 370],  [980, 540]]},
+        # Left-side approach: cars coming in from the left foreground
+        {"approach": "W", "polyline_px": [[320, 370],  [320, 540]]},
     ],
     "monitoring_zones": [
+        # N: upper arterial — the visible top road only (above the median)
         {"name": "queue_spillback_N", "kind": "queue_spillback",
-         "polygon_px": [[840, 80],   [1120, 80],  [1120, 260], [840, 260]]},
+         "polygon_px": [[180, 210],   [920, 210],  [920, 320], [180, 320]]},
+        # S: the intersection-bottom area between the crosswalk and the median
         {"name": "queue_spillback_S", "kind": "queue_spillback",
-         "polygon_px": [[740, 720],  [1140, 720], [1140, 1050], [740, 1050]]},
+         "polygon_px": [[380, 580],   [1040, 580], [1040, 720], [380, 720]]},
+        # E: right approach — the visible approach lane only, not the parking
         {"name": "queue_spillback_E", "kind": "queue_spillback",
-         "polygon_px": [[1500, 380], [1860, 380], [1860, 560], [1500, 560]]},
+         "polygon_px": [[940, 340],   [1240, 340], [1240, 560], [940, 560]]},
+        # W: left approach — the lane coming in from the left, not the parking
         {"name": "queue_spillback_W", "kind": "queue_spillback",
-         "polygon_px": [[60, 380],   [420, 380],  [420, 560],  [60, 560]]},
+         "polygon_px": [[260, 340],   [540, 340],  [540, 560],  [260, 560]]},
+        # Intersection core (just for outline)
         {"name": "conflict_zone_center", "kind": "conflict_zone",
-         "polygon_px": [[840, 260],  [1120, 260], [1500, 380], [1500, 560],
-                        [1140, 720], [740, 720],  [420, 560],  [420, 380]]},
+         "polygon_px": [[540, 320],   [940, 320],  [940, 560], [540, 560]]},
     ],
 }
 
@@ -190,11 +208,11 @@ def build_site_meta(width: int, height: int,
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     p.add_argument("--video", type=Path,
-                   default=Path("data/raw/youtube/anchor.mp4"))
+                   default=Path("/home/admin1/TheVideo.mp4"))
     p.add_argument("--out-dir", type=Path, default=Path("data/forecast"))
     p.add_argument("--center-lat", type=float, default=31.96686)
     p.add_argument("--center-lon", type=float, default=35.88704)
-    p.add_argument("--rtsp-url",   default="file://data/raw/youtube/anchor.mp4")
+    p.add_argument("--rtsp-url",   default="file:///home/admin1/TheVideo.mp4")
     p.add_argument("--keyframe-at-s", type=float, default=30.0)
     args = p.parse_args(argv)
 

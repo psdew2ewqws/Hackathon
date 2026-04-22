@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "traffic-intel://schemas/detector_count",
+  "title": "DetectorCount",
+  "description": "Phase 1 §6.3 per-detector 15-minute aggregate. One row per (detector, bin).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["timestamp", "intersection_id", "detector_id", "approach",
+               "lane", "lane_type", "vehicle_count"],
+  "properties": {
+    "timestamp":       {"type": "string", "format": "date-time"},
+    "intersection_id": {"type": "string", "pattern": "^[A-Z0-9_-]{1,16}$"},
+    "detector_id":     {"type": "string", "pattern": "^DET-[NSEW]-\\d+-\\d+$"},
+    "approach":        {"type": "string", "enum": ["N", "S", "E", "W"]},
+    "lane":            {"type": "integer", "minimum": 1, "maximum": 16},
+    "lane_type":       {"type": "string", "enum": ["left", "through", "right", "shared"]},
+    "vehicle_count":   {"type": "integer", "minimum": 0, "maximum": 5000},
+    "occupancy_pct":   {"type": "number", "minimum": 0, "maximum": 100},
+    "quality_flag":    {"type": "integer", "enum": [0, 1, 2]}
+  }
+}

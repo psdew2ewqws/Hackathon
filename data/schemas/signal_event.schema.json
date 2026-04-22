@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "traffic-intel://schemas/signal_event",
+  "title": "SignalEvent",
+  "description": "Phase 1 §6.4 NEMA signal phase transition. One event per (GREEN_ON, YELLOW_ON, RED_ON) per phase per cycle.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["timestamp", "intersection_id", "phase", "state"],
+  "properties": {
+    "timestamp":       {"type": "string", "format": "date-time"},
+    "intersection_id": {"type": "string", "pattern": "^[A-Z0-9_-]{1,16}$"},
+    "phase":           {"type": "integer", "enum": [1, 2, 3, 4, 5, 6, 7, 8]},
+    "state":           {"type": "string", "enum": ["GREEN_ON", "YELLOW_ON", "RED_ON"]}
+  }
+}

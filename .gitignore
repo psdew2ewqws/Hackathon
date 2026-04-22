@@ -70,3 +70,12 @@ data/metadata/backups/
 data/normalized/scenarios/
 data/raw/scenarios/
 data/research/
+
+# Frontend build artifacts + node_modules
+frontend/node_modules/
+frontend/dist/
+
+# Ingest-service runtime state (regenerated on each run)
+data/ingest_unified.ndjson
+data/ingest_errors.ndjson
+data/ingest_state.json

@@ -1,0 +1,193 @@
+.page {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 28px 32px 56px;
+  color: var(--fg);
+}
+
+.head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding-bottom: 16px;
+  margin-bottom: 22px;
+  border-bottom: 1px solid var(--border-soft);
+}
+.title {
+  font: 600 19px var(--sans);
+  letter-spacing: -0.01em;
+  color: var(--fg);
+}
+.subtitle {
+  margin-top: 4px;
+  font: 400 12px var(--mono);
+  color: var(--fg-faint);
+}
+.headRight {
+  font: 500 11px var(--mono);
+  color: var(--fg-dim);
+  letter-spacing: 0.04em;
+}
+
+.summary {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 18px;
+}
+.summaryCard {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  padding: 10px 14px;
+  min-width: 120px;
+}
+.summaryCard .label {
+  font: 500 10px var(--mono);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--fg-faint);
+  margin-bottom: 4px;
+}
+.summaryCard .value {
+  font: 600 18px var(--sans);
+  color: var(--fg);
+  font-variant-numeric: tabular-nums;
+}
+
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: 18px 20px;
+  margin-bottom: 16px;
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--fg-mute);
+  border-radius: var(--r-sm);
+  padding: 14px 16px;
+  margin-bottom: 10px;
+}
+.cardNormal   { border-left-color: var(--good); }
+.cardWarn     { border-left-color: var(--warn); }
+.cardIncident { border-left-color: var(--accent); }
+
+.cardHead {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+.cardTitle {
+  font: 600 13px var(--sans);
+  color: var(--fg);
+}
+.tag {
+  font: 600 9px var(--mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  color: var(--fg-dim);
+}
+.tagNormal   { color: var(--good); border-color: rgba(127,168,137,0.4); background: rgba(127,168,137,0.08); }
+.tagIncident { color: var(--accent); border-color: rgba(232,180,100,0.4); background: var(--accent-ghost); }
+.tagWarn     { color: var(--warn); border-color: rgba(214,143,107,0.4); background: rgba(214,143,107,0.08); }
+
+.conf {
+  margin-left: auto;
+  font: 500 11px var(--mono);
+  color: var(--fg-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+.interp {
+  font: 400 12.5px var(--sans);
+  color: var(--fg-dim);
+  margin-bottom: 8px;
+  line-height: 1.55;
+}
+
+.meta {
+  display: flex;
+  gap: 18px;
+  flex-wrap: wrap;
+  font: 400 11px var(--mono);
+  color: var(--fg-faint);
+  margin-bottom: 6px;
+}
+.meta b { color: var(--fg-dim); font-weight: 500; }
+
+.reasons {
+  margin-top: 8px;
+  padding: 8px 12px;
+  background: var(--surface-2);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--r-sm);
+  font: 400 11px var(--mono);
+  color: var(--fg-dim);
+}
+.reasons ul { margin: 0; padding-left: 18px; }
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+.table th {
+  text-align: left;
+  font: 500 10px var(--mono);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--fg-faint);
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  background: var(--surface);
+}
+.table td {
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--border-soft);
+  color: var(--fg-dim);
+  font-variant-numeric: tabular-nums;
+}
+.table td.mono, .table td .mono { font-family: var(--mono); }
+.table tr:hover td { background: var(--hover); }
+
+.statusCode200 { color: var(--good); }
+.statusCode3xx { color: var(--accent); }
+.statusCode4xx { color: var(--warn); }
+.statusCode5xx { color: var(--warn); }
+
+.empty {
+  padding: 40px 20px;
+  text-align: center;
+  color: var(--fg-faint);
+  font: 400 13px var(--sans);
+}
+
+.toolbar {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 14px;
+  font: 500 11px var(--mono);
+  color: var(--fg-dim);
+}
+.toolbar select, .toolbar input {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--fg);
+  padding: 5px 9px;
+  border-radius: var(--r-sm);
+  font: 500 11px var(--mono);
+}
+.toolbar select:focus, .toolbar input:focus {
+  outline: none;
+  border-color: rgba(232,180,100,0.4);
+}

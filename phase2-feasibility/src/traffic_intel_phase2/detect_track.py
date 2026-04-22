@@ -33,7 +33,8 @@ import supervision as sv
 from ultralytics import YOLO
 
 from .events import EventLog
-from .zones import load_stop_lines, load_zones
+from .homography import CameraTracker
+from .zones import load_lane_lines, load_lane_zones, load_stop_lines, load_zones
 
 
 class _MjpegBroadcaster:
@@ -197,6 +198,7 @@ def run(
     show_overlay: bool = False,
     mjpeg_port: int | None = None,
     half: bool | None = None,
+    homography: bool = True,
 ) -> dict:
     """Run detect + track. Returns a summary dict."""
 
@@ -215,12 +217,17 @@ def run(
     # Zones + lines from Phase 1 metadata (if present)
     zones: list = []
     lines: list = []
+    lane_lines: list = []
+    lane_zones: list = []
     if metadata_path and metadata_path.exists():
         try:
             zones = load_zones(metadata_path)
             lines = load_stop_lines(metadata_path)
+            lane_lines = load_lane_lines(metadata_path)
+            lane_zones = load_lane_zones(metadata_path)
             print(
-                f"[phase2] loaded {len(zones)} zones, {len(lines)} stop-lines "
+                f"[phase2] loaded {len(zones)} zones, {len(lines)} stop-lines, "
+                f"{len(lane_lines)} lane sub-lines, {len(lane_zones)} lane zones "
                 f"from {metadata_path.name}",
                 file=sys.stderr,
             )
@@ -258,6 +265,31 @@ def run(
     latencies_ms: list[float] = []
     line_crossings: dict[str, int] = {n.approach: 0 for n in lines}
     zone_counts_running: dict[str, int] = {z.name: 0 for z in zones}
+    lane_crossings_running: dict[str, int] = {ll.lane_id: 0 for ll in lane_lines}
+
+    # ── Camera motion tracker ─────────────────────────────────────────
+    # The site JSON defines all zones in the reference-frame pixel space.
+    # The RTSP feed (TheVideo.mp4 looped) pans/zooms, so we homography-
+    # warp every polygon per frame before drawing + counting.
+    camera = CameraTracker(update_every=2, smoothing=0.4, n_features=1200)
+
+    def _line_endpoints(line_zone) -> tuple[tuple[int, int], tuple[int, int]]:
+        """Pull (x0, y0), (x1, y1) out of an sv.LineZone regardless of
+        which supervision version exposes which attribute names."""
+        if hasattr(line_zone, "vector"):
+            v = line_zone.vector
+            return ((int(v.start.x), int(v.start.y)),
+                    (int(v.end.x),   int(v.end.y)))
+        return ((int(line_zone.start.x), int(line_zone.start.y)),
+                (int(line_zone.end.x),   int(line_zone.end.y)))
+
+    # Cache reference-frame geometry so we always warp from the same
+    # source (avoids warping-the-warped drift).
+    lane_zone_ref_polys = [lz.polygon.copy() for lz in lane_zones]
+    lane_line_ref_pts   = [_line_endpoints(ll.line) for ll in lane_lines]
+    stop_line_ref_pts   = [_line_endpoints(n.line)  for n in lines]
+    zone_ref_polys      = [z.polygon.copy() if z.polygon is not None else None
+                           for z in zones]
 
     try:
         stream = model.track(
@@ -279,6 +311,74 @@ def run(
             frame = result.orig_img  # BGR numpy array
             if frame is None:
                 continue
+
+            # Camera motion: update homography when enabled. For static
+            # cameras (e.g. TheVideo.mp4) we skip it — the reference-frame
+            # polygons are the source of truth and ORB keypoint noise would
+            # just add jitter.
+            if homography:
+                camera.update(frame)
+                warped_lane_polys = [
+                    camera.transform_polygon(p) for p in lane_zone_ref_polys]
+                warped_zone_polys = [
+                    camera.transform_polygon(p) if p is not None else None
+                    for p in zone_ref_polys]
+                warped_stop_line_pts = [
+                    camera.transform_line(p0, p1) for p0, p1 in stop_line_ref_pts]
+                warped_lane_line_pts = [
+                    camera.transform_line(p0, p1) for p0, p1 in lane_line_ref_pts]
+            else:
+                # Identity — use the reference-frame coords untouched.
+                warped_lane_polys = [p.copy() for p in lane_zone_ref_polys]
+                warped_zone_polys = [p.copy() if p is not None else None
+                                     for p in zone_ref_polys]
+                warped_stop_line_pts = list(stop_line_ref_pts)
+                warped_lane_line_pts = list(lane_line_ref_pts)
+            # Sync sv.LineZone endpoints so trigger() uses the warped line.
+            # The in/out counters stay preserved — we only mutate geometry.
+            # supervision's LineZone stores positions as .start and .end
+            # (sv.Point). Some versions cache them as .vector internally; we
+            # defensively refresh both without constructing sv.Vector
+            # (which isn't available in all supervision releases).
+            def _set_endpoints(line_zone, wx0, wy0, wx1, wy1):
+                try:
+                    line_zone.start = sv.Point(float(wx0), float(wy0))
+                    line_zone.end   = sv.Point(float(wx1), float(wy1))
+                except Exception:
+                    pass
+                # If the LineZone has a .vector with mutable start/end, patch it too
+                v = getattr(line_zone, "vector", None)
+                if v is not None:
+                    try:
+                        if hasattr(v, "start") and hasattr(v.start, "x"):
+                            v.start.x = float(wx0); v.start.y = float(wy0)
+                        if hasattr(v, "end") and hasattr(v.end, "x"):
+                            v.end.x = float(wx1); v.end.y = float(wy1)
+                    except Exception:
+                        pass
+
+            for named, ((wx0, wy0), (wx1, wy1)) in zip(lines, warped_stop_line_pts):
+                _set_endpoints(named.line, wx0, wy0, wx1, wy1)
+            for ll, ((wx0, wy0), (wx1, wy1)) in zip(lane_lines, warped_lane_line_pts):
+                _set_endpoints(ll.line, wx0, wy0, wx1, wy1)
+            # sv.PolygonZone caches a mask at __init__ and doesn't refresh
+            # when .polygon is mutated — plus our NamedZone / NamedLaneZone
+            # dataclasses are frozen. Build fresh PolygonZone instances keyed
+            # by name / lane_id each frame; trigger() against the fresh one.
+            fresh_lane_zones: dict[str, sv.PolygonZone] = {}
+            for lz, wpoly in zip(lane_zones, warped_lane_polys):
+                if wpoly is not None and len(wpoly) >= 3:
+                    try:
+                        fresh_lane_zones[lz.lane_id] = sv.PolygonZone(polygon=wpoly)
+                    except Exception:
+                        pass
+            fresh_big_zones: dict[str, sv.PolygonZone] = {}
+            for nz, wpoly in zip(zones, warped_zone_polys):
+                if wpoly is not None and len(wpoly) >= 3:
+                    try:
+                        fresh_big_zones[nz.name] = sv.PolygonZone(polygon=wpoly)
+                    except Exception:
+                        pass
 
             detections = sv.Detections.from_ultralytics(result)
             n_det = len(detections)
@@ -308,9 +408,34 @@ def run(
                             frame=frame_count,
                         )
 
-            # Zone occupancy
+            # Per-lane subdivision — each approach's polyline is split into
+            # N equal segments (one per lane). Emit a lane_crossing event
+            # every time any lane segment's total count changes.
+            for ll in lane_lines:
+                if tracked_for_lines is not None and len(tracked_for_lines) > 0:
+                    ll.line.trigger(tracked_for_lines)
+                ll_total = int(ll.line.in_count) + int(ll.line.out_count)
+                if ll_total != lane_crossings_running[ll.lane_id]:
+                    delta = ll_total - lane_crossings_running[ll.lane_id]
+                    lane_crossings_running[ll.lane_id] = ll_total
+                    if event_log:
+                        event_log.emit(
+                            "lane_crossing",
+                            approach=ll.approach,
+                            lane_id=ll.lane_id,
+                            lane_type=ll.lane_type,
+                            lane_idx=ll.lane_idx,
+                            delta=delta,
+                            in_count=int(ll.line.in_count),
+                            out_count=int(ll.line.out_count),
+                            frame=frame_count,
+                        )
+
+            # Zone occupancy — prefer freshly-built warped zone, fall back
+            # to the cached reference zone if the warped copy is bad.
             for named in zones:
-                mask = named.zone.trigger(detections)
+                zone_for_count = fresh_big_zones.get(named.name) or named.zone
+                mask = zone_for_count.trigger(detections)
                 inside = int(mask.sum())
                 prev = zone_counts_running[named.name]
                 zone_counts_running[named.name] = inside
@@ -355,6 +480,111 @@ def run(
 
                 annotated = box_annotator.annotate(annotated, detections=detections)
                 annotated = label_annotator.annotate(annotated, detections=detections, labels=labels)
+
+                # Per-lane colored heat-map — instantaneous occupancy
+                # (warped lane polygons follow camera motion)
+                # Per-approach instantaneous occupancy — emit once per second
+                # as the primary live signal for the dashboard.
+                lane_counts_now: dict[str, int] = {}
+                approach_occupancy_now: dict[str, int] = {
+                    "N": 0, "S": 0, "E": 0, "W": 0,
+                }
+                if lane_zones:
+                    overlay = annotated.copy()
+                    for lz, wpoly in zip(lane_zones, warped_lane_polys):
+                        zone_for_count = fresh_lane_zones.get(lz.lane_id) or lz.zone
+                        try:
+                            mask = zone_for_count.trigger(detections)
+                            n_in = int(mask.sum())
+                        except Exception:
+                            n_in = 0
+                        lane_counts_now[lz.lane_id] = n_in
+                        if   n_in == 0: color = (80, 200,  80)
+                        elif n_in <= 2: color = (80, 230, 220)
+                        elif n_in <= 4: color = (80, 220, 240)
+                        elif n_in <= 8: color = (60, 140, 240)
+                        else:           color = (60,  60, 230)
+                        cv2.fillPoly(overlay, [wpoly], color)
+                        cx = int(wpoly[:, 0].mean())
+                        cy = int(wpoly[:, 1].mean())
+                        cv2.putText(overlay, str(n_in), (cx - 10, cy + 8),
+                                    cv2.FONT_HERSHEY_SIMPLEX, 0.9,
+                                    (255, 255, 255), 2, cv2.LINE_AA)
+                    annotated = cv2.addWeighted(overlay, 0.30, annotated, 0.70, 0)
+
+                # Aggregate per-approach instantaneous counts from the lanes
+                for lid, v in lane_counts_now.items():
+                    a = lid.split("-")[0] if "-" in lid else None
+                    if a in approach_occupancy_now:
+                        approach_occupancy_now[a] += v
+
+                # Emit a per-second approach_occupancy event so the dashboard
+                # can surface "cars waiting at each stop" as the primary
+                # live metric. Throttle to every 15 frames (~1s at 15fps).
+                if event_log and frame_count % 15 == 0:
+                    for a, n in approach_occupancy_now.items():
+                        event_log.emit(
+                            "approach_occupancy",
+                            approach=a,
+                            count=int(n),
+                            frame=frame_count,
+                        )
+
+                # N/S/E/W big labels at warped approach zone centroids
+                # Use ASCII-only text (Hershey fonts don't render Unicode),
+                # colour-code per compass direction for at-a-glance clarity.
+                approach_label = {
+                    "N": "NORTH", "S": "SOUTH",
+                    "E": "EAST",  "W": "WEST",
+                }
+                approach_bgr = {
+                    "N": (232, 180, 100),   # amber
+                    "S": (100, 180, 232),   # sky blue
+                    "E": (120, 220, 140),   # green
+                    "W": (200, 140, 255),   # purple
+                }
+                for nz, wpoly in zip(zones, warped_zone_polys):
+                    if (not nz.name.startswith("queue_spillback_")
+                            or wpoly is None):
+                        continue
+                    approach = nz.name.split("_")[-1]
+                    total = sum(
+                        v for k, v in lane_counts_now.items()
+                        if k.startswith(f"{approach}-")
+                    )
+                    cx = int(wpoly[:, 0].mean())
+                    cy = int(wpoly[:, 1].mean())
+                    label = approach_label.get(approach, approach)
+                    color = approach_bgr.get(approach, (200, 200, 200))
+
+                    # Two-line label: "NORTH" + "N cars: 0"
+                    top_text = label
+                    bot_text = f"{total} cars"
+                    (tw1, th1), _ = cv2.getTextSize(
+                        top_text, cv2.FONT_HERSHEY_SIMPLEX, 1.3, 3)
+                    (tw2, th2), _ = cv2.getTextSize(
+                        bot_text, cv2.FONT_HERSHEY_SIMPLEX, 0.9, 2)
+                    box_w = max(tw1, tw2) + 28
+                    box_h = th1 + th2 + 30
+                    x0, y0 = cx - box_w // 2, cy - box_h // 2
+                    x1, y1 = cx + box_w // 2, cy + box_h // 2
+                    # Solid dark background so white text is readable even
+                    # on top of the colored zone fills
+                    cv2.rectangle(annotated, (x0, y0), (x1, y1),
+                                  (14, 18, 26), -1)
+                    cv2.rectangle(annotated, (x0, y0), (x1, y1),
+                                  color, 3)
+                    # Top line — direction in the approach colour
+                    cv2.putText(annotated, top_text,
+                                (cx - tw1 // 2, y0 + th1 + 8),
+                                cv2.FONT_HERSHEY_SIMPLEX, 1.3, color, 3,
+                                cv2.LINE_AA)
+                    # Bottom line — count in white
+                    cv2.putText(annotated, bot_text,
+                                (cx - tw2 // 2, y1 - 9),
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.9,
+                                (255, 255, 255), 2, cv2.LINE_AA)
+
                 for za in zone_annotators:
                     annotated = za.annotate(scene=annotated)
                 for named in lines:
@@ -443,6 +673,9 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--show", action="store_true", help="Show annotated window (requires GUI)")
     p.add_argument("--mjpeg-port", type=int, default=None,
                    help="Also serve annotated frames as MJPEG on http://127.0.0.1:<port>/stream.mjpeg")
+    p.add_argument("--no-homography", dest="homography", action="store_false",
+                   default=True,
+                   help="Disable camera-motion homography tracking (use for static feeds)")
     args = p.parse_args(argv)
 
     run(
@@ -460,6 +693,7 @@ def main(argv: list[str] | None = None) -> int:
         show_overlay=args.show,
         mjpeg_port=args.mjpeg_port,
         half=args.half,
+        homography=args.homography,
     )
     return 0
 

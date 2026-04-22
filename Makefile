@@ -313,6 +313,55 @@ forecast-predict: ## Full-day prediction; pass T=HH:MM for single-slot print
 
 forecast-all: forecast-download forecast-calibrate forecast-observe forecast-predict ## End-to-end anchor → forecast
 
+forecast-optimize: ## Webster/HCM signal-timing recommendation at T=HH:MM
+	@if [ -z "$(T)" ]; then echo "Usage: make forecast-optimize T=HH:MM"; exit 1; fi
+	$(VENV_PY) -m traffic_intel_sandbox.forecast.optimize --t $(T)
+
+# ─── Phase 2 §7.4 — ML forecast model ───────────────────────────────────────
+forecast-ml-train: setup ## Train LightGBM (+ optional LSTM) on detector counts + signal logs
+	$(VENV_PY) -m forecast_ml.train \
+	    --lgb-out    models/forecast_lgb.json \
+	    --lstm-out   models/forecast_lstm.pt \
+	    --report-out models/forecast_metrics.json \
+	    $(if $(SKIP_LSTM),--skip-lstm)
+
+forecast-ml-predict: setup ## Per-detector ML prediction at T=ISO (defaults to latest bin)
+	$(VENV_PY) -m forecast_ml.predict \
+	    --lgb-bundle models/forecast_lgb.json \
+	    $(if $(T),--ts $(T))
+
+# ─── Phase 2 §7.2 — unified ingest service ──────────────────────────────────
+ingest-layer: setup ## Single drain pass over all 3 source streams
+	$(VENV_PY) -m traffic_intel_phase2.ingest_layer
+
+ingest-layer-follow: setup ## Tail all 3 source streams forever; Ctrl+C to stop
+	$(VENV_PY) -m traffic_intel_phase2.ingest_layer --follow
+
+ingest-layer-reset: setup ## Reset cursor + wipe unified/errors NDJSON
+	$(VENV_PY) -m traffic_intel_phase2.ingest_layer --reset
+
+# ─── Live YOLO counts → real detector_counts parquet ────────────────────────
+live-counts: setup ## Aggregate phase2.ndjson crossings into today's counts parquet (real data)
+	$(VENV_PY) -m traffic_intel_phase2.live_counts
+
+live-counts-overwrite: setup ## Like live-counts but replaces synth for overlapping dates
+	$(VENV_PY) -m traffic_intel_phase2.live_counts --overwrite
+
+# ─── Frontend (React + Vite SPA at /signal-timing) ──────────────────────────
+FRONTEND_DIR := frontend
+
+frontend-install: ## npm install the React SPA deps
+	cd $(FRONTEND_DIR) && npm install
+
+frontend-dev: ## Run Vite dev server on :3000 (proxies /api/* to :8000)
+	cd $(FRONTEND_DIR) && npm run dev
+
+frontend-build: ## Production-build the SPA; viewer.py serves dist/ at /signal-timing
+	cd $(FRONTEND_DIR) && npm run build
+
+frontend-preview: ## Preview the built SPA on Vite's preview server
+	cd $(FRONTEND_DIR) && npm run preview
+
 research-compose: setup ## Stage 04: composite labeled synthetic video
 	$(VENV_PY) $(EXPERIMENTS)/04_compose_synthetic_video.py \
 		--plate $(RESEARCH_DIR)/plates/wadisaqra_plate.jpg \

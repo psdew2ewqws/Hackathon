@@ -1,0 +1,178 @@
+.shell {
+  display: grid;
+  grid-template-columns: 236px 1fr;
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--fg);
+}
+
+.sidebar {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  padding: 20px 0 14px;
+  overflow-y: auto;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 20px 14px;
+  border-bottom: 1px solid var(--border-soft);
+  margin-bottom: 16px;
+}
+.brandLogo {
+  width: 22px;
+  height: 22px;
+  position: relative;
+  flex-shrink: 0;
+}
+.brandLogo::before,
+.brandLogo::after {
+  content: '';
+  position: absolute;
+  background: var(--accent);
+  border-radius: 2px;
+}
+.brandLogo::before { inset: 0 auto auto 0; width: 22px; height: 6px; }
+.brandLogo::after  { inset: 9px 0 9px auto; width: 6px; height: 4px; background: var(--fg-dim); }
+.brandTitle {
+  font: 600 13px var(--sans);
+  color: var(--fg);
+  letter-spacing: -0.005em;
+  line-height: 1.2;
+}
+.brandSite {
+  font: 400 10px var(--mono);
+  color: var(--fg-dim);
+  margin-top: 2px;
+  letter-spacing: 0.04em;
+}
+
+.liveBar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 16px 18px;
+  padding: 8px 10px;
+  background: var(--surface-2);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--r-sm);
+  font: 500 10px var(--mono);
+  letter-spacing: 0.04em;
+}
+.liveDot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 0 rgba(232,180,100, 0.8);
+  animation: livepulse 1.8s ease-out infinite;
+  flex-shrink: 0;
+}
+.liveDotOff {
+  animation: none;
+  background: var(--fg-mute);
+  box-shadow: none;
+}
+@keyframes livepulse {
+  0%   { box-shadow: 0 0 0 0 rgba(232,180,100, 0.6); }
+  70%  { box-shadow: 0 0 0 6px rgba(232,180,100, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(232,180,100, 0); }
+}
+.liveLabel { color: var(--fg); letter-spacing: 0.08em; }
+.liveStat { color: var(--fg-dim); margin-left: auto; font-variant-numeric: tabular-nums; }
+
+.navGroup {
+  padding: 0 10px;
+  margin-bottom: 14px;
+}
+.navGroupLabel {
+  font: 600 9px var(--mono);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--fg-faint);
+  padding: 0 10px 6px;
+}
+.navList { list-style: none; padding: 0; margin: 0; }
+.navItem { margin: 1px 0; }
+
+.navLink {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font: 500 12.5px var(--sans);
+  color: var(--fg-dim);
+  text-decoration: none;
+  transition: background 0.15s, color 0.15s;
+}
+.navLink:hover {
+  background: var(--hover);
+  color: var(--fg);
+}
+.navLinkActive {
+  background: var(--accent-ghost);
+  color: var(--accent);
+}
+.navLinkActive:hover {
+  background: var(--accent-ghost);
+  color: var(--accent);
+}
+.navIcon {
+  width: 16px;
+  height: 16px;
+  stroke-width: 1.75;
+  flex-shrink: 0;
+  color: currentColor;
+}
+.navBadge {
+  margin-left: auto;
+  font: 500 10px var(--mono);
+  color: var(--fg-faint);
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  border: 1px solid var(--border-soft);
+}
+.navLinkActive .navBadge {
+  background: var(--surface);
+  border-color: rgba(232,180,100,0.25);
+  color: var(--accent);
+}
+
+.sidebarFooter {
+  margin-top: auto;
+  padding: 14px 22px 0;
+  border-top: 1px solid var(--border-soft);
+  font: 400 10px var(--mono);
+  color: var(--fg-faint);
+  letter-spacing: 0.04em;
+}
+.sidebarFooter .version { color: var(--fg-dim); }
+.sidebarFooter time { color: var(--fg-dim); font-variant-numeric: tabular-nums; }
+
+.content {
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* ── Responsive — stack sidebar on top at narrow widths ───────── */
+@media (max-width: 860px) {
+  .shell { grid-template-columns: 1fr; }
+  .sidebar {
+    position: relative;
+    height: auto;
+    padding: 12px 0;
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+  }
+  .brand { padding: 0 16px 10px; }
+  .liveBar { margin: 0 14px 12px; }
+  .navGroup { padding: 0 8px; margin-bottom: 8px; }
+  .sidebarFooter { display: none; }
+}

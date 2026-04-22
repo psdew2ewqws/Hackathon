@@ -87,15 +87,23 @@ class ClassifierVerdict:
     pass_used: str                 # "A" or "B"
     reasons: list[str]
     features: dict[str, Any]
+    # Phase 2 §7.3 enrichment — populated by classify_clip after the verdict
+    snapshot_path: str | None = None
+    estimated_queue_m: float | None = None
 
     def to_dict(self) -> dict:
-        return {
+        out: dict[str, Any] = {
             "predicted_tag":        self.predicted_tag,
             "predicted_confidence": round(self.predicted_confidence, 3),
             "classifier_version":   self.classifier_version,
             "pass_used":            self.pass_used,
             "reasons":              self.reasons,
         }
+        if self.snapshot_path is not None:
+            out["snapshot_path"] = self.snapshot_path
+        if self.estimated_queue_m is not None:
+            out["estimated_queue_m"] = round(self.estimated_queue_m, 1)
+        return out
 
 
 # ────────────────────────────────────────────────────────────────────────────
@@ -528,6 +536,66 @@ def _point_in_zone(pt, named_zone) -> bool:
 
 
 # ────────────────────────────────────────────────────────────────────────────
+# Phase 2 §7.3 enrichment — mid-window JPEG snapshot + queue-length estimate
+# ────────────────────────────────────────────────────────────────────────────
+
+# Physical model for queue length: vehicles × (avg length + gap). The handbook
+# gives 5 m + 2 m as typical urban spacing.
+VEHICLE_SLOT_M = 7.0
+DEFAULT_INCIDENTS_DIR = REPO_ROOT / "data/incidents"
+
+
+def _peak_queue_count(feats: ClipFeatures) -> int:
+    """Max per-frame count seen in any ``queue_spillback`` zone."""
+    raw = feats.__dict__.get("_raw_zone_events", [])
+    zone_kind = feats.__dict__.get("_zone_kind", {})
+    peak = 0
+    for ev in raw:
+        if zone_kind.get(ev["name"]) != "queue_spillback":
+            continue
+        c = int(ev.get("count", 0))
+        if c > peak:
+            peak = c
+    return peak
+
+
+def _emit_snapshot(
+    clip_stem: str,
+    tag: str,
+    normalized_dir: Path,
+    incidents_dir: Path,
+) -> str | None:
+    """Save one frame from the middle of the clip to
+    ``incidents_dir/<clip>_<tag>.jpg``. Returns the path (or None if the
+    source video is missing / OpenCV is unavailable)."""
+    video_path = normalized_dir / f"{clip_stem}.mp4"
+    if not video_path.exists():
+        return None
+    try:
+        import cv2  # noqa: WPS433
+    except Exception:
+        return None
+    cap = cv2.VideoCapture(str(video_path))
+    if not cap.isOpened():
+        return None
+    n_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT) or 0)
+    mid = max(0, n_frames // 2)
+    cap.set(cv2.CAP_PROP_POS_FRAMES, mid)
+    ok, frame = cap.read()
+    cap.release()
+    if not ok or frame is None:
+        return None
+    incidents_dir.mkdir(parents=True, exist_ok=True)
+    out_path = incidents_dir / f"{clip_stem}_{tag}.jpg"
+    cv2.imwrite(str(out_path), frame)
+    # Store a repo-relative path in the manifest so it survives a clone
+    try:
+        return str(out_path.relative_to(REPO_ROOT))
+    except ValueError:
+        return str(out_path)
+
+
+# ────────────────────────────────────────────────────────────────────────────
 # Top-level API
 # ────────────────────────────────────────────────────────────────────────────
 
@@ -547,6 +615,7 @@ def classify_clip(
     thresholds_path: Path = DEFAULT_THRESHOLDS,
     metadata_path: Path = DEFAULT_METADATA,
     normalized_dir: Path | None = None,
+    incidents_dir: Path = DEFAULT_INCIDENTS_DIR,
 ) -> ClassifierVerdict:
     thresholds = load_thresholds(thresholds_path)
     feats = extract_features(events_path)
@@ -560,7 +629,17 @@ def classify_clip(
             thresholds.get("version", "v1.0-rules"),
         )
         if pb is not None:
-            return pb
+            verdict = pb
+
+    # Phase 2 §7.3 enrichment for non-trivial verdicts
+    if verdict.predicted_tag == "queue_spillback":
+        peak = _peak_queue_count(feats)
+        if peak > 0:
+            verdict.estimated_queue_m = peak * VEHICLE_SLOT_M
+    if verdict.predicted_tag not in ("normal", "insufficient_evidence") and normalized_dir is not None:
+        snap = _emit_snapshot(feats.clip, verdict.predicted_tag, normalized_dir, incidents_dir)
+        if snap is not None:
+            verdict.snapshot_path = snap
     return verdict
 
 
@@ -600,7 +679,10 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--metadata", type=Path, default=DEFAULT_METADATA)
     p.add_argument("--normalized-dir", type=Path, default=None,
                    help="If set, Pass B runs on insufficient-evidence clips using "
-                        "<normalized-dir>/<clip>.mp4")
+                        "<normalized-dir>/<clip>.mp4 and mid-window JPEG snapshots "
+                        "are emitted for non-trivial verdicts")
+    p.add_argument("--incidents-dir", type=Path, default=DEFAULT_INCIDENTS_DIR,
+                   help="Where to write per-incident mid-window JPEG snapshots")
     args = p.parse_args(argv)
 
     verdicts: list[ClassifierVerdict] = []
@@ -618,6 +700,7 @@ def main(argv: list[str] | None = None) -> int:
             thresholds_path=args.thresholds,
             metadata_path=args.metadata,
             normalized_dir=args.normalized_dir,
+            incidents_dir=args.incidents_dir,
         )
         verdicts.append(v)
         print(json.dumps({

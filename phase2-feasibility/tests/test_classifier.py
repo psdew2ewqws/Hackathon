@@ -195,3 +195,74 @@ def test_thresholds_file_is_valid_yaml() -> None:
     for key in ("gridlock", "queue_spillback", "sudden_congestion",
                 "unexpected_trajectory", "normal"):
         assert key in th["pass_a"], f"missing Pass A rule: {key}"
+
+
+# ── Phase 2 §7.3 enrichment tests — queue length + mid-window snapshot ─────
+
+def test_queue_spillback_sets_estimated_queue_m(tmp_path: Path) -> None:
+    """queue_spillback verdicts should carry an estimated queue length in
+    metres (peak zone count × 7 m per slot)."""
+    # Same synth fixture as test_queue_spillback_rule_fires, but peak count 9
+    events = [_zone_occ(i, "queue_spillback_E", "queue_spillback", count=9)
+              for i in range(50)]
+    events.append(_line_xing(frame=20, approach="E", delta=1))
+    events.append(_run_end(line_crossings={"N": 0, "S": 0, "E": 1, "W": 0},
+                           unique_tracks=20))
+    p = _write_ndjson(tmp_path, "spill-q", events)
+    v = classify_clip(p, DEFAULT_THRESHOLDS)
+    assert v.predicted_tag == "queue_spillback", v
+    assert v.estimated_queue_m is not None
+    # 9 vehicles × 7 m/slot = 63 m
+    assert 60 <= v.estimated_queue_m <= 70, v.estimated_queue_m
+
+
+def test_non_spillback_has_no_queue_length(tmp_path: Path) -> None:
+    events = [
+        _zone_occ(5, "queue_spillback_N", "queue_spillback", count=1),
+        _run_end(unique_tracks=30, line_crossings={"N": 1, "S": 1, "E": 2, "W": 1}),
+    ]
+    p = _write_ndjson(tmp_path, "normal-q", events)
+    v = classify_clip(p, DEFAULT_THRESHOLDS)
+    assert v.predicted_tag == "normal"
+    assert v.estimated_queue_m is None
+
+
+def test_snapshot_is_emitted_when_video_available(tmp_path: Path) -> None:
+    """classify_clip should write a mid-window JPEG when a video exists in
+    normalized_dir and the verdict is non-trivial."""
+    # Build a 30-frame 160×90 video so we can exercise the cv2 write path.
+    cv2 = pytest.importorskip("cv2")
+    import numpy as np
+    video_dir = tmp_path / "norm"
+    video_dir.mkdir()
+    incidents_dir = tmp_path / "incidents"
+    clip_name = "test_snap_clip"
+    vid = cv2.VideoWriter(
+        str(video_dir / f"{clip_name}.mp4"),
+        cv2.VideoWriter_fourcc(*"mp4v"), 10.0, (160, 90),
+    )
+    for _ in range(30):
+        vid.write(np.full((90, 160, 3), 100, dtype=np.uint8))
+    vid.release()
+
+    # Synthesize a gridlock-triggering ndjson
+    events = [
+        *[_zone_occ(i, "queue_spillback_N", "queue_spillback", count=10)
+          for i in range(0, 80, 2)],
+        _run_end(unique_tracks=42, line_crossings={"N": 0, "S": 0, "E": 0, "W": 0}),
+    ]
+    # IMPORTANT: the clip name comes from events_path.stem → match the video name
+    p = _write_ndjson(tmp_path, clip_name, events)
+
+    v = classify_clip(p, DEFAULT_THRESHOLDS,
+                      normalized_dir=video_dir,
+                      incidents_dir=incidents_dir)
+    assert v.predicted_tag == "gridlock"
+    assert v.snapshot_path is not None, v
+    # Either repo-relative or absolute; the file itself must exist
+    out_path = Path(v.snapshot_path)
+    if not out_path.is_absolute():
+        out_path = REPO_ROOT / out_path
+    # Our synthetic path is under tmp_path, so the relative_to() in _emit_snapshot
+    # falls through to absolute — check whichever it is
+    assert (incidents_dir / f"{clip_name}_gridlock.jpg").exists() or out_path.exists()

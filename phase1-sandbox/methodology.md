@@ -92,11 +92,95 @@ in the Amman context when real operational feeds are unavailable. SimToll
 itself is reserved as an external validation benchmark for Phase 3
 forecasting.
 
-### 3.6 Annotation
+### 3.6 Signal-timing what-if simulator (Webster + HCM)
+
+*Wired up 2026-04-21.* The dashboard at `/signal-timing` lets a human
+operator evaluate signal-timing changes for any target time of day,
+using the forecast as the demand input. This delivers Handbook §7.5
+(Phase 2 quick-build) and §8.3 (full module): *extension of green for
+high-demand approaches, reduction of green for low-demand periods,
+adjustments to cycle length, identification of anticipated congestion
+periods.* §11 compliance is honoured — the tool is read-only advisory,
+no external controller is modified.
+
+**Algorithm** (see `forecast/optimize.py` for the exact code +
+citations):
+
+| Quantity | Formula | Source |
+|---|---|---|
+| Flow ratio | y_i = v_i / (s · n_i) | Webster 1958 |
+| Critical Y | Y = y_NSthru + y_EWthru | Webster 1958 |
+| Optimal cycle | C_opt = (1.5 L + 5) / (1 − Y), clamped [60, 120] | Webster 1958 |
+| Phase split | g_i = (y_i / Y) · (C_opt − L) | Webster 1958 |
+| v/c ratio | X_i = v_i C / (s · n_i · g_i) | HCM Ch. 18 |
+| Uniform delay | d_i = 0.5 C (1 − g/C)² / (1 − min(1, X) g/C) | HCM Ch. 18 |
+
+Static constants: s = 1800 veh/hr/lane, L = 20 s/cycle (4 phases × 5 s
+lost time), MIN/MAX green = 7 / 60 s.
+
+**§8.3 advisory rules** (advisory output only):
+- X > 0.9: extend green on that approach +5 s
+- X < 0.5: reduce green −5 s
+- Any X ≥ 1.0 with Y ≥ 0.85: raise cycle toward 120 s
+- Forecast ratio(T) ≥ 2.4: anticipated congestion slot
+
+**Calibration caveat.** YOLO26 zone-entry counts over-estimate
+realised throughput ~5× because the tracker flickers on/off across
+occlusions. `optimize.py` applies a `correction_factor = 0.2` before
+Webster runs. This is explicit and configurable — a future track-id-
+aware counter would let us drop it.
+
+**SPA stack**: React + Vite + TypeScript, served at
+`/signal-timing` (production build) with Vite dev proxy on :3000
+during development. `viewer.py` remains the single Python backend; all
+/api/* routes are unchanged.
+
+### 3.7 Annotation
 
 - CVAT 2.x (latest) is stood up via `docker-compose --profile annotation`.
 - Taxonomy is fixed up-front in `annotation/taxonomy.yml`: 6 object classes (COCO subset) + 6 event-window tags (handbook §6.6).
 - The seeder creates initial tasks from a bounded subset of historical clips to avoid spamming CVAT.
+
+### 3.8 ML forecast model (Phase 2 §7.4)
+
+LightGBM regression is the production forecaster; a tiny PyTorch LSTM is
+trained alongside for handbook completeness.
+
+- **Training data**: 30 days of synth detector counts (22 detectors × 96 bins
+  × 30 d ≈ 63,360 rows) plus the matching signal logs. Regenerate with
+  `make synth-all SANDBOX_DAYS=30`.
+- **Features per row**: five lagged counts (t-15, t-30, t-60 min, t-24 h,
+  t-7 d), cyclical hour-of-day + day-of-week, weekend flag, fraction of the
+  last 15-min bin where the detector's main NEMA phase was GREEN, and a
+  categorical `detector_code`. Full list in
+  `phase3-fullstack/src/forecast_ml/features.py`.
+- **Targets**: `y_now` (nowcast) plus `y_15min`, `y_30min`, `y_60min`
+  horizons — one LightGBM model per target.
+- **Baseline**: persistence (predict same count as the previous 15-min bin).
+  On the 30-day set LightGBM beats persistence by ≥10 % MAE on 4/4 horizons
+  (`y_60min` MAE 41.8 → 6.1, a ~85 % reduction).
+- **Artifacts**: `models/forecast_lgb.json` (4 boosters bundled as
+  JSON-of-strings), `models/forecast_lstm.pt`, `models/forecast_metrics.json`
+  (full report + feature columns, consumed by the dashboard).
+- **Runtime**: `make forecast-ml-train` (~12 min CPU, LightGBM-only ~11
+  min). Inference is millisecond-scale via `forecast_ml.predict.predict_at`
+  and the `/api/forecast/ml` endpoint.
+
+### 3.9 Unified ingest layer + isolation proof (Phase 2 §7.2, §7.7)
+
+- `traffic_intel_phase2.ingest_layer` tails all three source streams
+  (`data/detector_counts/*.parquet`, `data/signal_logs/*.ndjson`,
+  `data/events/phase2.ndjson`), validates each record against the JSON
+  schemas in `data/schemas/`, and emits one unified NDJSON
+  (`data/ingest_unified.ndjson`) plus an error sidecar
+  (`data/ingest_errors.ndjson`). A cursor in `data/ingest_state.json` makes
+  repeated invocations idempotent.
+- Isolation (§7.7) is evidenced in
+  `phase2-feasibility/docs/isolation_proof.md`: every outbound HTTP call
+  enumerated, all bindings confirmed `127.0.0.1`, bearer-token gate on POST
+  (`DASHBOARD_TOKEN` env var — there are no POST routes in Phase 2 so the
+  gate is fail-closed by default), and `/api/audit` exposes a tail of
+  `data/audit.log` for after-the-fact review.
 
 ## 4. Limitations
 
