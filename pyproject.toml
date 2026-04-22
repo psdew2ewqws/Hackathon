@@ -56,7 +56,7 @@ forecast-ml-predict  = "forecast_ml.predict:main"
 where = ["phase1-sandbox/src", "phase2-feasibility/src", "phase3-fullstack/src"]
 
 [tool.pytest.ini_options]
-testpaths = ["phase1-sandbox/tests", "phase2-feasibility/tests"]
+testpaths = ["phase1-sandbox/tests", "phase2-feasibility/tests", "tests/phase3"]
 addopts = "-ra --strict-markers"
 markers = [
     "requires_stream: test needs a live RTSP stream",

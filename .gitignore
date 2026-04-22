@@ -79,3 +79,8 @@ frontend/dist/
 data/ingest_unified.ndjson
 data/ingest_errors.ndjson
 data/ingest_state.json
+
+# Phase 3 large / runtime artifacts (videos, DB, snapshots, binary mediamtx)
+data/calibration_pack/
+phase3-fullstack/data/
+phase3-fullstack/bin/mediamtx

@@ -1,0 +1,22 @@
+{
+  "_note": "Identity mapping used by §8.1 acquisition layer when upstream records omit approach/lane.",
+  "approach_aliases": {
+    "north": "N",
+    "south": "S",
+    "east": "E",
+    "west": "W",
+    "nb": "S",
+    "sb": "N",
+    "eb": "W",
+    "wb": "E"
+  },
+  "camera_to_site": {
+    "CAM-WADI-01": "wadi_saqra"
+  },
+  "detector_to_approach": {
+    "DET-N-1-1": "N", "DET-N-2-1": "N",
+    "DET-S-1-1": "S", "DET-S-2-1": "S",
+    "DET-E-1-1": "E", "DET-E-2-1": "E",
+    "DET-W-1-1": "W", "DET-W-2-1": "W"
+  }
+}

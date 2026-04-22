@@ -1,44 +1,111 @@
-import { lazy, Suspense } from 'react';
-import { BrowserRouter, Route, Routes } from 'react-router-dom';
-import { Layout } from './components/Layout';
+import { BrowserRouter, Route, Routes, useLocation } from 'react-router-dom';
+import { Nav } from './components/Nav';
+import { AuthProvider } from './auth/AuthContext';
+import { RequireAuth } from './auth/RequireAuth';
+import { ForecastPage } from './pages/Forecast';
+import { LivePage } from './pages/Live';
+import { SignalPage } from './pages/Signal';
+import { LoginPage } from './pages/LoginPage';
+import { IncidentsPage } from './pages/IncidentsPage';
+import { SystemPage } from './pages/SystemPage';
+import { AuditPage } from './pages/AuditPage';
+import { AnalysisPage } from './pages/AnalysisPage';
+import { SignalTimingPage } from './pages/SignalTimingPage';
 
-// Route-split: each page loads its own JS chunk on demand so the landing
-// dashboard doesn't drag in the code for tabs the user hasn't visited yet.
-const VideoPage = lazy(() =>
-  import('./pages/VideoPage').then((m) => ({ default: m.VideoPage })),
-);
-const SystemPage = lazy(() =>
-  import('./pages/SystemPage').then((m) => ({ default: m.SystemPage })),
-);
-const IncidentsPage = lazy(() =>
-  import('./pages/IncidentsPage').then((m) => ({ default: m.IncidentsPage })),
-);
-const AuditPage = lazy(() =>
-  import('./pages/AuditPage').then((m) => ({ default: m.AuditPage })),
-);
-const AnalysisPage = lazy(() =>
-  import('./pages/AnalysisPage').then((m) => ({ default: m.AnalysisPage })),
-);
+function Shell({ children }: { children: React.ReactNode }) {
+  const location = useLocation();
+  const hideNav = location.pathname === '/login';
+  return (
+    <div style={{ minHeight: '100vh', background: '#0b0f14', color: '#e6edf3' }}>
+      {!hideNav && <Nav />}
+      {children}
+    </div>
+  );
+}
 
 export default function App() {
   return (
-    <BrowserRouter>
-      <Layout>
-        <Suspense
-          fallback={
-            <div style={{ padding: 40, color: '#9097A0' }}>Loading…</div>
-          }
-        >
+    <BrowserRouter basename={import.meta.env.BASE_URL}>
+      <AuthProvider>
+        <Shell>
           <Routes>
-            <Route path="/" element={<VideoPage />} />
-            <Route path="/incidents" element={<IncidentsPage />} />
-            <Route path="/analysis" element={<AnalysisPage />} />
-            <Route path="/system" element={<SystemPage />} />
-            <Route path="/audit" element={<AuditPage />} />
-            <Route path="*" element={<VideoPage />} />
+            <Route path="/login" element={<LoginPage />} />
+
+            <Route
+              path="/"
+              element={
+                <RequireAuth minRole="viewer">
+                  <LivePage />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/signal"
+              element={
+                <RequireAuth minRole="operator">
+                  <SignalPage />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/signal-timing"
+              element={
+                <RequireAuth minRole="operator">
+                  <SignalTimingPage />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/forecast"
+              element={
+                <RequireAuth minRole="operator">
+                  <ForecastPage />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/incidents"
+              element={
+                <RequireAuth minRole="operator">
+                  <IncidentsPage />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/history"
+              element={
+                <RequireAuth minRole="operator">
+                  <AnalysisPage />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/system"
+              element={
+                <RequireAuth minRole="admin">
+                  <SystemPage />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/audit"
+              element={
+                <RequireAuth minRole="admin">
+                  <AuditPage />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="*"
+              element={
+                <RequireAuth minRole="viewer">
+                  <LivePage />
+                </RequireAuth>
+              }
+            />
           </Routes>
-        </Suspense>
-      </Layout>
+        </Shell>
+      </AuthProvider>
     </BrowserRouter>
   );
 }

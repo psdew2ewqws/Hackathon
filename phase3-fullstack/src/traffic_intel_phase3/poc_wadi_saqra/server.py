@@ -1,0 +1,1309 @@
+"""FastAPI entrypoint: boots the tracker, serves counts + MJPEG + a minimal UI.
+
+Run:
+    uvicorn traffic_intel_phase3.poc_wadi_saqra.server:app --host 0.0.0.0 --port 8000
+
+Endpoints:
+    /               minimal HTML dashboard (live MJPEG + counters)
+    /mjpeg          multipart MJPEG of the annotated tracker frames
+    /api/counts     latest per-approach snapshot
+    /api/gmaps      per-corridor gmaps row for the configured hour
+    /api/fusion     fused per-approach state
+    /api/recommendation  Webster green-time plan
+    /ws/counts      WebSocket: bin-boundary updates
+"""
+from __future__ import annotations
+
+import asyncio
+import datetime as _dt
+import json
+import logging
+import os
+from pathlib import Path
+from typing import Any
+
+from fastapi import Body, Depends, FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect, status
+from fastapi.responses import HTMLResponse, StreamingResponse
+from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel
+
+from .fusion import (
+    build_heatmap,
+    forecast_per_approach,
+    fuse,
+    load_gmaps,
+    load_gmaps_all,
+    webster_two_phase,
+)
+from ..acquisition.metrics import shared as _shared_ingest_metrics
+from ..acquisition.service import AcquisitionService, ReconnectPolicy
+from ..auth.deps import AuthContext, get_auth_context, require_role, set_service as _set_jwt_service
+from ..auth.jwt_service import make_service as _make_jwt_service
+from ..auth.users import UsersRepository, ensure_default_users
+from ..forecast.bridge import (
+    forecast_ml_available,
+    forecast_ml_horizons,
+    four_phase_nema_recommendation,
+    model_metrics as _forecast_model_metrics,
+)
+from ..forecast.holiday_calendar import is_holiday, next_holiday
+from ..storage.db import get_db
+from ..storage.sinks import StorageSink
+from .events import EventEngine
+from .signal_sim import CurrentPlan, SignalSimulator
+from .tracker import TrackerConfig, TrackerService
+
+LOG = logging.getLogger("poc_wadi_saqra")
+logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO"))
+
+ROOT = Path(__file__).resolve().parents[4]  # repo root
+SITE_CFG_PATH = ROOT / "phase3-fullstack" / "configs" / "wadi_saqra.json"
+ZONES_PATH = ROOT / "phase3-fullstack" / "configs" / "wadi_saqra_zones.json"
+COUNTS_NDJSON = ROOT / "phase3-fullstack" / "data" / "counts.ndjson"
+SIGNAL_NDJSON = ROOT / "phase3-fullstack" / "data" / "signal_log.ndjson"
+EVENTS_NDJSON = ROOT / "phase3-fullstack" / "data" / "events.ndjson"
+EVENT_SNAPSHOTS_DIR = ROOT / "phase3-fullstack" / "data" / "event_snapshots"
+EVENT_CLIPS_DIR = ROOT / "phase3-fullstack" / "data" / "event_clips"
+DEFAULT_MODEL = ROOT / "models" / "yolo26n.pt"
+
+
+def _load_site_cfg() -> dict[str, Any]:
+    return json.loads(SITE_CFG_PATH.read_text())
+
+
+app = FastAPI(title="Wadi Saqra PoC", version="0.1.0")
+_site = _load_site_cfg()
+_gmaps_path = ROOT / _site["gmaps"]["typical_ndjson"]
+_gmaps_hour = float(_site["gmaps"]["match_local_hour"])
+_tracker = TrackerService(TrackerConfig(
+    rtsp_url=_site["source"]["url"],
+    model_path=DEFAULT_MODEL,
+    zones_path=ZONES_PATH,
+    ingest_fps=float(_site["source"].get("ingest_fps", 10)),
+    bin_seconds=15,
+    counts_ndjson=COUNTS_NDJSON,
+))
+
+_current_plan_raw = (_site.get("signal") or {}).get("current_plan") or {}
+_signal_sim = SignalSimulator(
+    intersection_id=_site.get("site_id", "wadi_saqra"),
+    plan=CurrentPlan(
+        NS_green=float(_current_plan_raw.get("NS_green", 35)),
+        EW_green=float(_current_plan_raw.get("EW_green", 35)),
+        yellow=float(_current_plan_raw.get("yellow", 3)),
+        all_red=float(_current_plan_raw.get("all_red", 2)),
+    ),
+    ndjson_path=SIGNAL_NDJSON,
+)
+
+_event_engine = EventEngine(
+    ndjson_path=EVENTS_NDJSON,
+    snapshot_dir=EVENT_SNAPSHOTS_DIR,
+    snapshot_provider=lambda: _tracker.state.last_jpeg,
+)
+_db = get_db()
+_sink = StorageSink(db=_db)
+_users = UsersRepository(db=_db)
+ensure_default_users(_users)
+_jwt = _make_jwt_service()
+_set_jwt_service(_jwt)
+_ingest_metrics = _shared_ingest_metrics()
+_acquisition = AcquisitionService(
+    ingest_state_file=ROOT / "data" / "ingest_state.json",
+    detector_dir=ROOT / "data" / "detector_counts",
+    signal_dir=ROOT / "data" / "signal_logs",
+    incidents_file=ROOT / "data" / "events" / "phase2.ndjson",
+    unified_out=ROOT / "data" / "ingest_unified.ndjson",
+    errors_out=ROOT / "data" / "ingest_errors.ndjson",
+    metrics=_ingest_metrics,
+    reconnect=ReconnectPolicy(),
+    poll_interval_s=10.0,
+)
+
+
+class _LoginRequest(BaseModel):
+    username: str
+    password: str
+
+
+class _LoginResponse(BaseModel):
+    token: str
+    username: str
+    role: str
+    expires_at: int
+
+
+def _log_audit(ctx: AuthContext | None, action: str, resource: str, payload: dict | None = None, ip: str | None = None) -> None:
+    user_row = _users.find(ctx.username) if ctx else None
+    _sink.push("audit", {
+        "user_id": user_row[0].id if user_row else None,
+        "username": ctx.username if ctx else None,
+        "role": ctx.role if ctx else None,
+        "action": action,
+        "resource": resource,
+        "payload": payload,
+        "ip": ip,
+    })
+
+_ws_clients: set[WebSocket] = set()
+_ws_signal_clients: set[WebSocket] = set()
+_ws_event_clients: set[WebSocket] = set()
+_loop_ref: dict[str, asyncio.AbstractEventLoop] = {}
+_SITE_ID = _site.get("site_id", "wadi_saqra")
+
+
+def _broadcast_bin(record: dict) -> None:
+    loop = _loop_ref.get("loop")
+    if not loop:
+        return
+    msg = json.dumps({"type": "bin", "record": record})
+    async def _send_all() -> None:
+        stale = []
+        for ws in list(_ws_clients):
+            try:
+                await ws.send_text(msg)
+            except Exception:
+                stale.append(ws)
+        for ws in stale:
+            _ws_clients.discard(ws)
+    asyncio.run_coroutine_threadsafe(_send_all(), loop)
+
+
+def _broadcast_signal(event: dict) -> None:
+    loop = _loop_ref.get("loop")
+    if not loop:
+        return
+    msg = json.dumps({"type": "signal", "event": event})
+    async def _send_all() -> None:
+        stale = []
+        for ws in list(_ws_signal_clients):
+            try:
+                await ws.send_text(msg)
+            except Exception:
+                stale.append(ws)
+        for ws in stale:
+            _ws_signal_clients.discard(ws)
+    asyncio.run_coroutine_threadsafe(_send_all(), loop)
+
+
+def _broadcast_event(event: dict) -> None:
+    loop = _loop_ref.get("loop")
+    if not loop:
+        return
+    msg = json.dumps({"type": "event", "event": event})
+    async def _send_all() -> None:
+        stale = []
+        for ws in list(_ws_event_clients):
+            try:
+                await ws.send_text(msg)
+            except Exception:
+                stale.append(ws)
+        for ws in stale:
+            _ws_event_clients.discard(ws)
+    asyncio.run_coroutine_threadsafe(_send_all(), loop)
+
+
+def _tracker_on_bin(bin_record: dict) -> None:
+    """Bridge tracker bins into the event engine alongside current fused state,
+    and persist per-approach counts to SQLite."""
+    try:
+        rows = load_gmaps(_gmaps_path, _gmaps_hour)
+        merged = {
+            a: {
+                "in_zone": c.get("in_zone", 0),
+                "crossings_in_bin": (bin_record.get("crossings_in_bin") or {}).get(a, 0),
+            }
+            for a, c in (_tracker.state.counts or {}).items()
+        }
+        fused = fuse(merged, bin_seconds=bin_record.get("seconds", 15), gmaps_rows=rows)
+        _event_engine.on_bin(bin_record, fused)
+        _event_engine.classify_recent_incidents()
+        # Persist per-approach counts for this bin.
+        bin_end = bin_record.get("bin_end")
+        ts = _dt.datetime.fromtimestamp(bin_end, tz=_dt.timezone.utc).astimezone().isoformat(timespec="milliseconds") if bin_end else None
+        if ts:
+            for approach, count in (bin_record.get("crossings_in_bin") or {}).items():
+                _sink.push("detector_count", {
+                    "site_id": _SITE_ID, "ts": ts, "approach": approach,
+                    "count": int(count),
+                    "occupancy_pct": (bin_record.get("in_zone") or {}).get(approach),
+                })
+    except Exception:
+        LOG.exception("event engine on_bin failed")
+
+
+def _signal_sim_to_sink(event: dict) -> None:
+    try:
+        _sink.push("signal_event", {
+            "site_id": _SITE_ID,
+            "ts": event["timestamp"],
+            "cycle_number": event.get("cycle_number"),
+            "phase_number": event["phase_number"],
+            "phase_name": event.get("phase_name"),
+            "signal_state": event["signal_state"],
+            "duration_s": event.get("duration_seconds"),
+        })
+    except Exception:
+        LOG.exception("signal -> sink failed")
+
+
+def _event_engine_to_sink(event: dict) -> None:
+    try:
+        _sink.push("incident", {
+            "site_id": _SITE_ID,
+            "ts": event["ts"],
+            "event_id": event["event_id"],
+            "event_type": event["event_type"],
+            "approach": event.get("approach"),
+            "severity": event["severity"],
+            "confidence": event.get("confidence"),
+            "payload": event.get("payload"),
+            "snapshot_uri": event.get("snapshot_uri"),
+            "clip_uri": event.get("clip_uri"),
+        })
+    except Exception:
+        LOG.exception("event -> sink failed")
+
+
+def _tracker_on_frame(
+    ts: float,
+    track_ids: list[int],
+    centroids: list[tuple[float, float]],
+    approach_map: dict[int, str | None],
+    direction_map: dict[str, str],
+) -> None:
+    try:
+        cur = _signal_sim.state.current if _signal_sim else None
+        phase_name = cur.get("phase_name") if cur else None
+        state = cur.get("signal_state") if cur else None
+        _event_engine.on_track_frame(
+            ts=ts,
+            track_ids=[int(t) for t in track_ids],
+            centroids=[(float(x), float(y)) for x, y in centroids],
+            approach_for_track={int(k): v for k, v in approach_map.items()},
+            approach_directions=direction_map,
+            signal_phase_name=phase_name,
+            signal_state=state,
+        )
+    except Exception:
+        LOG.exception("event engine on_frame failed")
+
+
+@app.on_event("startup")
+async def _startup() -> None:
+    _loop_ref["loop"] = asyncio.get_running_loop()
+    _sink.start()
+    _acquisition.start()
+    _tracker.on_bin(_broadcast_bin)
+    _tracker.on_bin(_tracker_on_bin)
+    _tracker.on_frame(_tracker_on_frame)
+    _tracker.start()
+    _signal_sim.on_event(_broadcast_signal)
+    _signal_sim.on_event(_signal_sim_to_sink)
+    _signal_sim.start()
+    _event_engine.on_event(_broadcast_event)
+    _event_engine.on_event(_event_engine_to_sink)
+
+
+@app.on_event("shutdown")
+async def _shutdown() -> None:
+    _tracker.stop()
+    _signal_sim.stop()
+    _event_engine.close()
+    _acquisition.stop()
+    _sink.stop()
+
+
+# ---------------- HTTP ----------------
+
+@app.get("/", response_class=HTMLResponse)
+async def index() -> str:
+    return _INDEX_HTML
+
+
+@app.post("/api/auth/login", response_model=_LoginResponse)
+async def api_auth_login(req: _LoginRequest, request: Request) -> _LoginResponse:
+    user = _users.verify(req.username, req.password)
+    if not user:
+        _log_audit(None, "login_failed", "/api/auth/login",
+                   {"username": req.username}, ip=request.client.host if request.client else None)
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail="bad credentials")
+    token, payload = _jwt.issue(user.username, user.role)
+    _log_audit(AuthContext(username=user.username, role=user.role),
+               "login", "/api/auth/login", None,
+               ip=request.client.host if request.client else None)
+    return _LoginResponse(token=token, username=user.username, role=user.role,
+                          expires_at=payload.exp)
+
+
+@app.get("/api/auth/me")
+async def api_auth_me(ctx: AuthContext = Depends(get_auth_context)) -> dict:
+    return {"username": ctx.username, "role": ctx.role}
+
+
+@app.get("/api/audit/log")
+async def api_audit_log(
+    limit: int = 100,
+    ctx: AuthContext = Depends(require_role("admin")),
+) -> dict:
+    rows = _db.query_all(
+        "SELECT ts, username, role, action, resource, payload, ip "
+        "FROM audit_log ORDER BY id DESC LIMIT ?",
+        (max(1, min(1000, limit)),),
+    )
+    return {"events": rows}
+
+
+@app.get("/api/ingest/metrics")
+async def api_ingest_metrics() -> dict:
+    return _ingest_metrics.snapshot()
+
+
+@app.get("/api/ingest/errors")
+async def api_ingest_errors(limit: int = 50,
+                            ctx: AuthContext = Depends(require_role("operator"))) -> dict:
+    rows = _db.query_all(
+        "SELECT ts, source, reason, record FROM ingest_errors ORDER BY id DESC LIMIT ?",
+        (max(1, min(500, limit)),),
+    )
+    return {"errors": rows}
+
+
+@app.get("/api/history/daily")
+async def api_history_daily(
+    days: int = 7,
+    ctx: AuthContext = Depends(require_role("operator")),
+) -> dict:
+    days = max(1, min(30, days))
+    row = _db.query_all(
+        "SELECT substr(ts, 1, 10) AS date, approach, SUM(count) AS total "
+        "FROM detector_counts "
+        "GROUP BY date, approach ORDER BY date DESC, approach LIMIT ?",
+        (days * 4,),
+    )
+    incidents = _db.query_all(
+        "SELECT substr(ts, 1, 10) AS date, event_type, severity, COUNT(*) AS n "
+        "FROM incidents GROUP BY date, event_type, severity "
+        "ORDER BY date DESC, event_type LIMIT 500"
+    )
+    return {"counts_by_day": row, "incidents_by_day": incidents}
+
+
+@app.get("/api/health")
+async def api_health() -> dict:
+    row = _db.query_one(
+        "SELECT (SELECT COUNT(*) FROM detector_counts) AS counts, "
+        "       (SELECT COUNT(*) FROM signal_events)   AS signals, "
+        "       (SELECT COUNT(*) FROM incidents)       AS incidents"
+    )
+    return {
+        "tracker": {"running": _tracker.state.running, "fps": round(_tracker.state.fps, 2),
+                    "last_error": _tracker.state.last_error},
+        "signal_sim": {"running": _signal_sim.state.running},
+        "storage": row,
+        "sink_queue": _sink._q.qsize() if hasattr(_sink, "_q") else None,  # noqa: SLF001
+    }
+
+
+@app.get("/api/site")
+async def api_site() -> dict:
+    return _site
+
+
+@app.get("/api/counts")
+async def api_counts() -> dict:
+    s = _tracker.state
+    return {
+        "running": s.running,
+        "fps": round(s.fps, 2),
+        "frame_ts": s.frame_ts,
+        "bin_start_ts": s.bin_start_ts,
+        "bin_seconds": s.bin_seconds,
+        "counts": s.counts,
+        "crossings_in_current_bin": s.crossings_in_current_bin,
+        "last_error": s.last_error,
+    }
+
+
+@app.get("/api/gmaps")
+async def api_gmaps(hour: float | None = None) -> dict:
+    h = _gmaps_hour if hour is None else float(hour)
+    rows = load_gmaps(_gmaps_path, h)
+    return {
+        "local_hour": h,
+        "rows": {k: v.__dict__ for k, v in rows.items()},
+    }
+
+
+@app.get("/api/fusion")
+async def api_fusion() -> dict:
+    s = _tracker.state
+    rows = load_gmaps(_gmaps_path, _gmaps_hour)
+    merged: dict[str, dict[str, int]] = {}
+    for approach, c in s.counts.items():
+        merged[approach] = {
+            "in_zone": c.get("in_zone", 0),
+            "crossings_in_bin": s.crossings_in_current_bin.get(approach, 0),
+        }
+    fused = fuse(merged, bin_seconds=s.bin_seconds, gmaps_rows=rows)
+    return {"local_hour": _gmaps_hour, "fused": fused}
+
+
+@app.get("/api/recommendation")
+async def api_recommendation() -> dict:
+    payload = await api_fusion()
+    current_plan = (_site.get("signal") or {}).get("current_plan")
+    rec = webster_two_phase(payload["fused"], current_plan=current_plan)
+    return {
+        "local_hour": _gmaps_hour,
+        "signal": _site.get("signal"),
+        "fused": payload["fused"],
+        "recommendation": rec,
+    }
+
+
+@app.get("/api/forecast")
+async def api_forecast(hour: float) -> dict:
+    fusion_payload = await api_fusion()
+    fused_now = fusion_payload["fused"]
+    gmaps_now = load_gmaps(_gmaps_path, _gmaps_hour)
+    gmaps_target = load_gmaps(_gmaps_path, float(hour))
+    predicted = forecast_per_approach(fused_now, gmaps_now, gmaps_target)
+    current_plan = (_site.get("signal") or {}).get("current_plan")
+    rec = webster_two_phase(predicted, current_plan=current_plan)
+    return {
+        "requested_hour": float(hour),
+        "baseline_hour": _gmaps_hour,
+        "predicted": predicted,
+        "recommendation": rec,
+    }
+
+
+@app.get("/api/heatmap")
+async def api_heatmap() -> dict:
+    fusion_payload = await api_fusion()
+    all_rows = load_gmaps_all(_gmaps_path)
+    return build_heatmap(fusion_payload["fused"], all_rows, _gmaps_hour)
+
+
+@app.get("/api/forecast/ml")
+async def api_forecast_ml(target: str | None = None) -> dict:
+    """§8.3 LightGBM forecast at +0/+15/+30/+60 min per detector + per approach.
+
+    ``target`` accepts ISO-8601 (e.g. 2026-04-22T10:00:00+03:00) or "HHMM" /
+    "HH:MM" for today-local. Defaults to now.
+    """
+    parsed_ts = None
+    if target:
+        try:
+            # HHMM or HH:MM -> today-local (Asia/Amman +03:00).
+            if ":" in target and "T" not in target:
+                hh, mm = target.split(":")
+                now = _dt.datetime.now().replace(
+                    hour=int(hh), minute=int(mm), second=0, microsecond=0)
+                parsed_ts = now
+            elif len(target) == 4 and target.isdigit():
+                hh, mm = int(target[:2]), int(target[2:])
+                parsed_ts = _dt.datetime.now().replace(
+                    hour=hh, minute=mm, second=0, microsecond=0)
+            else:
+                parsed_ts = _dt.datetime.fromisoformat(target)
+        except Exception as exc:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=f"bad target: {exc}")
+    payload = forecast_ml_horizons(target_ts=parsed_ts)
+    # Attach calendar context.
+    ref = parsed_ts or _dt.datetime.now()
+    hol, name = is_holiday(ref)
+    upcoming_iso, upcoming_name = next_holiday(ref)
+    payload.setdefault("calendar", {})
+    payload["calendar"].update({
+        "reference_ts": ref.isoformat(),
+        "is_holiday": hol,
+        "holiday_name": name,
+        "next_holiday": {"date": upcoming_iso, "name": upcoming_name},
+    })
+    return payload
+
+
+@app.get("/api/forecast/ml/metrics")
+async def api_forecast_ml_metrics() -> dict:
+    return _forecast_model_metrics()
+
+
+@app.get("/api/recommendation/nema")
+async def api_recommendation_nema() -> dict:
+    """§8.3 NEMA 4-phase Webster recommendation alongside the 2-phase default."""
+    fused = (await api_fusion())["fused"]
+    current_plan = (_site.get("signal") or {}).get("current_plan")
+    return four_phase_nema_recommendation(fused, current_plan=current_plan)
+
+
+@app.get("/api/forecast/horizon")
+async def api_forecast_horizon(start: float | None = None, hours: float = 12.0, step: float = 0.5) -> dict:
+    """Rolling forecast: predict per-approach pressure + Webster plan at each
+    half-hour tick starting at ``start`` (defaults to the gmaps baseline hour),
+    running for ``hours`` hours total.
+    """
+    start = _gmaps_hour if start is None else float(start)
+    hours = max(0.5, min(24.0, float(hours)))
+    step = max(0.5, float(step))
+
+    fusion_payload = await api_fusion()
+    fused_now = fusion_payload["fused"]
+    gmaps_now = load_gmaps(_gmaps_path, _gmaps_hour)
+    current_plan = (_site.get("signal") or {}).get("current_plan")
+
+    # Generate tick hours, wrapping across midnight so "start=22, hours=8" still works.
+    n_steps = int(hours / step) + 1
+    ticks: list[float] = []
+    for i in range(n_steps):
+        ticks.append(round((start + i * step) % 24.0, 2))
+
+    series: list[dict] = []
+    for h in ticks:
+        gmaps_target = load_gmaps(_gmaps_path, h)
+        predicted = forecast_per_approach(fused_now, gmaps_now, gmaps_target)
+        rec = webster_two_phase(predicted, current_plan=current_plan)
+        cmp = rec.get("comparison") or {}
+        series.append({
+            "hour": h,
+            "per_approach": {
+                a: {
+                    "pressure": predicted.get(a, {}).get("pressure"),
+                    "label": predicted.get(a, {}).get("label"),
+                    "gmaps_ratio": predicted.get(a, {}).get("gmaps_congestion_ratio"),
+                    "gmaps_label": predicted.get(a, {}).get("gmaps_label"),
+                    "gmaps_speed_kmh": predicted.get(a, {}).get("gmaps_speed_kmh"),
+                    "scale_vs_now": predicted.get(a, {}).get("scale_vs_now"),
+                }
+                for a in ("S", "N", "E", "W")
+            },
+            "recommended": {
+                "cycle_seconds": rec.get("cycle_seconds"),
+                "NS_green": cmp.get("recommended", {}).get("NS_green"),
+                "EW_green": cmp.get("recommended", {}).get("EW_green"),
+                "delay_reduction_pct": cmp.get("delay_reduction_pct"),
+            },
+        })
+
+    return {
+        "start_hour": start,
+        "hours": hours,
+        "step": step,
+        "baseline_hour": _gmaps_hour,
+        "gmaps_source": str(_gmaps_path),
+        "ticks": series,
+    }
+
+
+@app.get("/api/signal/current")
+async def api_signal_current() -> dict:
+    return _signal_sim.snapshot()
+
+
+@app.get("/api/signal/log")
+async def api_signal_log(limit: int = 50) -> dict:
+    return {"events": _signal_sim.recent(limit=max(1, min(500, limit)))}
+
+
+@app.get("/api/events")
+async def api_events(limit: int = 50, event_type: str | None = None) -> dict:
+    return {"events": _event_engine.recent(limit=max(1, min(500, limit)), event_type=event_type)}
+
+
+@app.post("/api/events/_demo")
+async def api_events_demo() -> dict:
+    """Emit one example of each detector for UI verification. Real events come
+    organically from the tracker + signal sim."""
+    _event_engine._emit(  # type: ignore[attr-defined]
+        "congestion_class_change", approach="E", severity="warning", confidence=0.85,
+        payload={"from": "free", "to": "heavy", "direction": "up", "pressure": 13.5, "gmaps_label": "heavy"},
+    )
+    _event_engine._emit(
+        "queue_spillback", approach="S", severity="critical", confidence=0.9,
+        payload={"queue_count": 24, "threshold": 20, "duration_s": 12.0},
+    )
+    _event_engine._emit(
+        "abnormal_stopping", approach="N", severity="warning", confidence=0.7,
+        payload={"track_id": 42, "stationary_seconds": 9.2, "signal_phase": "NS", "signal_state": "GREEN ON"},
+    )
+    _event_engine._emit(
+        "stalled_vehicle", approach="W", severity="warning", confidence=0.8,
+        payload={"track_id": 99, "stationary_seconds": 22.5},
+    )
+    _event_engine._emit(
+        "wrong_way", approach="E", severity="critical", confidence=0.88,
+        payload={"track_id": 131, "dot_vs_expected": -0.84, "speed_px_per_s": 14.2, "expected_direction": "left"},
+    )
+    _event_engine.classify_recent_incidents(window_s=60.0)
+    return {"emitted": 5}
+
+
+@app.websocket("/ws/events")
+async def ws_events(ws: WebSocket) -> None:
+    await ws.accept()
+    _ws_event_clients.add(ws)
+    try:
+        await ws.send_text(json.dumps({
+            "type": "snapshot",
+            "recent": _event_engine.recent(limit=50),
+        }))
+        while True:
+            await ws.receive_text()
+    except WebSocketDisconnect:
+        pass
+    finally:
+        _ws_event_clients.discard(ws)
+
+
+@app.websocket("/ws/signal")
+async def ws_signal(ws: WebSocket) -> None:
+    await ws.accept()
+    _ws_signal_clients.add(ws)
+    try:
+        await ws.send_text(json.dumps({
+            "type": "snapshot",
+            "record": _signal_sim.snapshot(),
+            "recent": _signal_sim.recent(limit=20),
+        }))
+        while True:
+            await ws.receive_text()
+    except WebSocketDisconnect:
+        pass
+    finally:
+        _ws_signal_clients.discard(ws)
+
+
+@app.get("/mjpeg")
+async def mjpeg() -> StreamingResponse:
+    boundary = "frame"
+    async def gen():
+        while True:
+            jpeg = _tracker.state.last_jpeg
+            if jpeg:
+                yield (b"--" + boundary.encode() + b"\r\n"
+                       b"Content-Type: image/jpeg\r\n"
+                       b"Content-Length: " + str(len(jpeg)).encode() + b"\r\n\r\n"
+                       + jpeg + b"\r\n")
+            await asyncio.sleep(0.1)
+    return StreamingResponse(gen(), media_type=f"multipart/x-mixed-replace; boundary={boundary}")
+
+
+@app.websocket("/ws/counts")
+async def ws_counts(ws: WebSocket) -> None:
+    await ws.accept()
+    _ws_clients.add(ws)
+    try:
+        await ws.send_text(json.dumps({"type": "snapshot", "record": (await api_counts())}))
+        while True:
+            await ws.receive_text()
+    except WebSocketDisconnect:
+        pass
+    finally:
+        _ws_clients.discard(ws)
+
+
+_REACT_DIST = ROOT / "frontend" / "dist"
+if _REACT_DIST.exists():
+    app.mount("/app", StaticFiles(directory=str(_REACT_DIST), html=True), name="app")
+
+# Static serve for event media (snapshots + clips).
+if EVENT_SNAPSHOTS_DIR.exists() or not EVENT_SNAPSHOTS_DIR.exists():
+    EVENT_SNAPSHOTS_DIR.mkdir(parents=True, exist_ok=True)
+    EVENT_CLIPS_DIR.mkdir(parents=True, exist_ok=True)
+    # Mount a single /event_media/ that can serve both subdirs by symlink.
+    media_root = ROOT / "phase3-fullstack" / "data" / "event_media"
+    media_root.mkdir(parents=True, exist_ok=True)
+    for src in (EVENT_SNAPSHOTS_DIR, EVENT_CLIPS_DIR):
+        link = media_root / src.name.replace("event_", "")
+        try:
+            if not link.exists():
+                link.symlink_to(src)
+        except OSError:
+            pass
+    app.mount("/event_media", StaticFiles(directory=str(media_root)), name="event_media")
+
+
+# ---- legacy-path aliases so the routed phase-2 pages keep working -------
+
+@app.get("/api/incidents")
+async def api_incidents_alias(limit: int = 200) -> dict:
+    """Alias: the routed IncidentsPage expects /api/incidents with a flat list."""
+    events = _event_engine.recent(limit=max(1, min(500, limit)))
+    return {"incidents": events, "events": events}
+
+
+@app.get("/api/audit")
+async def api_audit_alias(n: int = 200,
+                          ctx: AuthContext = Depends(require_role("admin"))) -> dict:
+    rows = _db.query_all(
+        "SELECT ts, username, role, action, resource, ip FROM audit_log "
+        "ORDER BY id DESC LIMIT ?", (max(1, min(1000, n)),))
+    return {"events": rows, "audit": rows}
+
+
+@app.get("/api/architecture")
+async def api_architecture_alias() -> dict:
+    """Alias: the routed SystemPage expects /api/architecture."""
+    return await api_health()
+
+
+@app.get("/api/events/{event_id}")
+async def api_event_by_id(event_id: str) -> dict:
+    row = _db.query_one(
+        "SELECT * FROM incidents WHERE event_id = ?",
+        (event_id,),
+    )
+    if not row:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="event not found")
+    return row
+
+
+_INDEX_HTML = """<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<title>Wadi Saqra PoC - live tracker</title>
+<style>
+  :root { color-scheme: dark; }
+  body { font-family: system-ui, -apple-system, Segoe UI, sans-serif; margin: 0; background: #0b0f14; color: #e6edf3; }
+  header { padding: 14px 18px; background: #121820; border-bottom: 1px solid #1e2630; display:flex; align-items:center; gap:18px; }
+  header h1 { font-size: 18px; margin: 0; font-weight: 600; }
+  header .meta { font-size: 12px; opacity: .75; }
+  main { display: grid; grid-template-columns: 1.4fr 1fr; gap: 14px; padding: 14px; }
+  .card { background: #121820; border: 1px solid #1e2630; border-radius: 10px; padding: 12px; }
+  .card h2 { font-size: 13px; margin: 0 0 10px; letter-spacing: .04em; text-transform: uppercase; opacity: .75; }
+  img { width: 100%; display: block; border-radius: 8px; background: #000; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid #1e2630; }
+  th { font-weight: 500; opacity: .7; }
+  .pill { display:inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 600; }
+  .pill-free { background:#14532d; color:#86efac; }
+  .pill-light { background:#1e40af; color:#bfdbfe; }
+  .pill-moderate { background:#78350f; color:#fde68a; }
+  .pill-heavy { background:#7c2d12; color:#fdba74; }
+  .pill-jam { background:#7f1d1d; color:#fecaca; }
+  .app-S { color: #66ff88; }
+  .app-N { color: #ff7a7a; }
+  .app-E { color: #f5a53c; }
+  .app-W { color: #4aaccb; }
+  footer { opacity:.6; font-size: 12px; padding: 8px 18px 18px; }
+  /* Signal indicators */
+  .sig-row { display:grid; grid-template-columns: 90px 1fr 1fr; gap: 10px; align-items:center; padding: 6px 0; }
+  .sig-label { font-weight: 600; font-size: 14px; letter-spacing: .04em; }
+  .sig-light { width: 20px; height: 20px; border-radius: 50%; display:inline-block; vertical-align: middle; margin-right: 6px; background:#2a2f38; box-shadow: inset 0 0 0 1px #3a414d; }
+  .sig-light.green { background:#22c55e; box-shadow: 0 0 12px #22c55e; }
+  .sig-light.yellow { background:#eab308; box-shadow: 0 0 12px #eab308; }
+  .sig-light.red { background:#ef4444; box-shadow: 0 0 12px #ef4444; }
+  .sig-bar { height: 8px; background:#1e2630; border-radius: 4px; overflow: hidden; }
+  .sig-bar > span { display:block; height: 100%; background:#22c55e; transition: width .2s linear; }
+  .sig-log { max-height: 180px; overflow-y: auto; font-family: ui-monospace, Menlo, monospace; font-size: 11px; }
+  .sig-log div { padding: 2px 0; border-bottom: 1px solid #1e2630; }
+  /* Heatmap */
+  .hm-wrap { overflow-x: auto; }
+  .hm-grid { display:grid; grid-template-columns: 40px repeat(48, 1fr); gap: 2px; min-width: 900px; }
+  .hm-row-label { font-weight: 700; font-size: 14px; display:flex; align-items:center; justify-content:flex-end; padding-right: 6px; }
+  .hm-cell { height: 22px; border-radius: 2px; position: relative; background:#1e2630; }
+  .hm-cell.sel { outline: 2px solid #e6edf3; }
+  .hm-cell.cur { outline: 2px dashed #f5a53c; }
+  .hm-axis { display:grid; grid-template-columns: 40px repeat(48, 1fr); gap: 2px; font-size: 10px; opacity:.55; margin-top: 4px; }
+  .hm-axis span { text-align: center; }
+  .slider-row { display:flex; align-items:center; gap:12px; margin-bottom: 10px; }
+  .slider-row input[type=range] { flex: 1; }
+  .pill-free { background:#14532d; color:#86efac; }
+  .pill-light { background:#1e40af; color:#bfdbfe; }
+  .pill-moderate { background:#78350f; color:#fde68a; }
+  .pill-heavy { background:#7c2d12; color:#fdba74; }
+  .pill-jam { background:#7f1d1d; color:#fecaca; }
+  .hm-free { background:#14532d; } .hm-light { background:#1e40af; } .hm-moderate { background:#78350f; } .hm-heavy { background:#7c2d12; } .hm-jam { background:#7f1d1d; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Wadi Saqra PoC - live tracker</h1>
+  <span class="meta" id="meta">connecting...</span>
+</header>
+<main>
+  <section class="card">
+    <h2>Annotated RTSP feed</h2>
+    <img src="/mjpeg" alt="live"/>
+  </section>
+  <section class="card">
+    <h2>Per-approach counts</h2>
+    <table>
+      <thead><tr>
+        <th>Approach</th><th>In zone</th><th>Cross total</th><th>Cross bin</th><th>gmaps</th><th>Class</th>
+      </tr></thead>
+      <tbody id="counts"></tbody>
+    </table>
+  </section>
+  <section class="card" style="grid-column: 1 / -1">
+    <h2>Signal plan - current vs Webster (2-phase)</h2>
+    <table id="plan-table" style="max-width: 640px">
+      <thead><tr>
+        <th>Plan</th><th>NS green</th><th>EW green</th><th>Yellow</th><th>All-red</th><th>Cycle</th><th>Delay (s/veh)</th>
+      </tr></thead>
+      <tbody></tbody>
+    </table>
+    <div id="plan-summary" style="margin-top: 10px; opacity: .9;"></div>
+  </section>
+  <section class="card">
+    <h2>Live signal state (&sect;6.4)</h2>
+    <div id="sig-cycle" style="font-size: 13px; opacity: .8; margin-bottom: 10px;"></div>
+    <div class="sig-row">
+      <span class="sig-label">NS <span style="opacity:.5;font-weight:400;font-size:11px">(N+S)</span></span>
+      <span id="sig-ns-state"><span class="sig-light"></span><span class="sig-text">-</span></span>
+      <span><div class="sig-bar"><span id="sig-ns-bar" style="width:0%"></span></div><span id="sig-ns-remain" style="font-size:11px;opacity:.7"></span></span>
+    </div>
+    <div class="sig-row">
+      <span class="sig-label">EW <span style="opacity:.5;font-weight:400;font-size:11px">(E+W)</span></span>
+      <span id="sig-ew-state"><span class="sig-light"></span><span class="sig-text">-</span></span>
+      <span><div class="sig-bar"><span id="sig-ew-bar" style="width:0%"></span></div><span id="sig-ew-remain" style="font-size:11px;opacity:.7"></span></span>
+    </div>
+  </section>
+  <section class="card">
+    <h2>Recent signal events</h2>
+    <div id="sig-log" class="sig-log"></div>
+  </section>
+  <section class="card" style="grid-column: 1 / -1">
+    <h2>Live events (&sect;6.6)</h2>
+    <div style="display:flex; gap:10px; margin-bottom: 8px; font-size: 11px; flex-wrap: wrap;">
+      <span class="pill" style="background:#14532d;color:#86efac">congestion_class_change</span>
+      <span class="pill" style="background:#7c2d12;color:#fdba74">queue_spillback</span>
+      <span class="pill" style="background:#78350f;color:#fde68a">abnormal_stopping</span>
+      <span class="pill" style="background:#1e40af;color:#bfdbfe">stalled_vehicle</span>
+      <span class="pill" style="background:#7f1d1d;color:#fecaca">wrong_way</span>
+      <span class="pill" style="background:#7f1d1d;color:#fecaca">incident</span>
+      <span style="opacity:.6">&middot; severity: <strong style="color:#fde68a">warning</strong> / <strong style="color:#fecaca">critical</strong></span>
+      <button id="ev-demo" style="margin-left:auto; background:#1f2937; color:#e6edf3; border:1px solid #2d3748; border-radius:6px; padding:4px 10px; cursor:pointer; font-size: 11px;">Emit demo events</button>
+    </div>
+    <div id="ev-list" class="sig-log" style="max-height: 260px"></div>
+  </section>
+  <section class="card" style="grid-column: 1 / -1">
+    <h2>Forecast heatmap (24h &middot; half-hour) &mdash; drag slider to pick time</h2>
+    <div class="slider-row">
+      <input type="range" id="hm-slider" min="0" max="23.5" step="0.5" value="10.0"/>
+      <div style="font-size: 14px; min-width: 180px;">selected <strong id="hm-hour">10:00</strong> &middot; current <strong id="hm-current">10:00</strong></div>
+    </div>
+    <div class="hm-wrap">
+      <div id="hm-grid" class="hm-grid"></div>
+      <div id="hm-axis" class="hm-axis"></div>
+    </div>
+    <div style="margin-top: 10px; display:flex; gap:8px; flex-wrap:wrap; font-size: 11px;">
+      <span class="pill pill-free">free</span>
+      <span class="pill pill-light">light</span>
+      <span class="pill pill-moderate">moderate</span>
+      <span class="pill pill-heavy">heavy</span>
+      <span class="pill pill-jam">jam</span>
+    </div>
+    <div id="hm-forecast" style="margin-top: 14px;"></div>
+  </section>
+  <section class="card" style="grid-column: 1 / -1">
+    <h2>Next-N hours rolling forecast (gmaps-driven)</h2>
+    <div class="slider-row">
+      <label style="font-size: 12px; opacity:.8">start <input id="hz-start" type="number" min="0" max="23.5" step="0.5" value="10" style="width: 70px; background:#0b0f14; color:#e6edf3; border:1px solid #1e2630; border-radius:4px; padding:4px;"/></label>
+      <label style="font-size: 12px; opacity:.8">horizon <input id="hz-hours" type="number" min="1" max="24" step="1" value="12" style="width: 60px; background:#0b0f14; color:#e6edf3; border:1px solid #1e2630; border-radius:4px; padding:4px;"/> h</label>
+      <button id="hz-run" style="background:#1f2937; color:#e6edf3; border:1px solid #2d3748; border-radius:6px; padding:6px 14px; cursor:pointer;">Forecast</button>
+      <span id="hz-meta" style="opacity:.6; font-size: 12px;"></span>
+    </div>
+    <div class="hm-wrap">
+      <div id="hz-grid" class="hm-grid"></div>
+      <div id="hz-axis" class="hm-axis"></div>
+    </div>
+    <div id="hz-cycle" style="margin-top: 10px; font-size: 12px; opacity:.8;"></div>
+    <div id="hz-table" style="margin-top: 10px;"></div>
+  </section>
+</main>
+<footer>PoC &middot; RTSP &middot; 10 FPS ingest &middot; gmaps hour <span id="hour"></span></footer>
+<script>
+const ORDER = ['N','S','E','W'];
+
+function el(tag, attrs, ...children) {
+  const n = document.createElement(tag);
+  if (attrs) for (const k of Object.keys(attrs)) {
+    if (k === 'class') n.className = attrs[k];
+    else if (k === 'text') n.textContent = attrs[k];
+    else n.setAttribute(k, attrs[k]);
+  }
+  for (const c of children) if (c != null) n.appendChild(typeof c === 'string' ? document.createTextNode(c) : c);
+  return n;
+}
+
+function pill(label) {
+  const cls = 'pill pill-' + String(label || 'free').toLowerCase();
+  return el('span', { class: cls, text: label || '-' });
+}
+
+function td(...children) { return el('td', null, ...children); }
+
+function render(c, f, r) {
+  const meta = document.getElementById('meta');
+  const running = c.running ? 'live' : 'idle';
+  const fps = (typeof c.fps === 'number') ? c.fps.toFixed(1) : '0.0';
+  const err = c.last_error ? '  |  ' + c.last_error : '';
+  meta.textContent = running + '  |  ' + fps + ' FPS  |  bin ' + c.bin_seconds + 's' + err;
+  document.getElementById('hour').textContent = (f.local_hour != null) ? f.local_hour.toFixed(1) : '-';
+
+  const tbody = document.getElementById('counts');
+  tbody.replaceChildren();
+  for (const a of ORDER) {
+    const row = (f.fused || {})[a] || {};
+    const cBin = (c.crossings_in_current_bin || {})[a] || 0;
+    const cTot = ((c.counts || {})[a] || {}).crossings_total || 0;
+    const gm = row.gmaps_label || '-';
+    const cls = row.label || '-';
+    const r1 = el('td', { class: 'app-' + a }, el('strong', { text: a }));
+    const tr = el('tr', null,
+      r1,
+      td(String(row.in_zone ?? 0)),
+      td(String(cTot)),
+      td(String(cBin)),
+      td(pill(gm), el('span', { style: 'opacity:.6; margin-left:6px', text: 'r=' + (row.gmaps_congestion_ratio ?? '-') })),
+      td(pill(cls), el('span', { style: 'opacity:.6; margin-left:6px', text: 'p=' + (row.pressure ?? '-') })),
+    );
+    tbody.appendChild(tr);
+  }
+
+  const rec = r.recommendation || {};
+  const cmp = rec.comparison || null;
+  const planBody = document.querySelector('#plan-table tbody');
+  planBody.replaceChildren();
+  if (cmp) {
+    const rows = [
+      { name: 'Current (field)', p: cmp.current,     cls: '' },
+      { name: 'Recommended',     p: cmp.recommended, cls: 'app-S' },
+    ];
+    for (const row of rows) {
+      const p = row.p;
+      const tr = el('tr', null,
+        el('td', { class: row.cls }, el('strong', { text: row.name })),
+        td(p.NS_green.toFixed(1) + 's'),
+        td(p.EW_green.toFixed(1) + 's'),
+        td(p.yellow.toFixed(1) + 's'),
+        td(p.all_red.toFixed(1) + 's'),
+        td(p.cycle_seconds.toFixed(1) + 's'),
+        td(p.uniform_delay_sec_per_veh.toFixed(2)),
+      );
+      planBody.appendChild(tr);
+    }
+    const summary = document.getElementById('plan-summary');
+    const imp = cmp.delay_reduction_pct;
+    const phases = rec.phases || {};
+    const y_ns = (phases.NS?.flow_ratio ?? 0).toFixed(2);
+    const y_ew = (phases.EW?.flow_ratio ?? 0).toFixed(2);
+    summary.replaceChildren(
+      document.createTextNode('Y=' + (rec.flow_ratio_total ?? 0).toFixed(2)),
+      document.createTextNode('  |  y_NS=' + y_ns + '  y_EW=' + y_ew),
+      document.createTextNode('  |  est. delay reduction '),
+      el('strong', { text: (imp == null ? '-' : imp + '%') }),
+    );
+  }
+}
+
+async function refresh() {
+  try {
+    const [c, f, r] = await Promise.all([
+      fetch('/api/counts').then(r => r.json()),
+      fetch('/api/fusion').then(r => r.json()),
+      fetch('/api/recommendation').then(r => r.json()),
+    ]);
+    render(c, f, r);
+  } catch (e) {
+    document.getElementById('meta').textContent = 'error: ' + e.message;
+  }
+}
+setInterval(refresh, 1000);
+refresh();
+
+// ---- Signal status ----
+function fmtTime(hr) {
+  const h = Math.floor(hr);
+  const m = Math.round((hr - h) * 60);
+  return String(h).padStart(2,'0') + ':' + String(m).padStart(2,'0');
+}
+function stateColorClass(state) {
+  if (!state) return '';
+  if (state.indexOf('GREEN') >= 0) return 'green';
+  if (state.indexOf('YELLOW') >= 0) return 'yellow';
+  if (state.indexOf('RED') >= 0) return 'red';
+  return '';
+}
+let sigPhaseStart = null;
+let sigCurrent = null;
+async function refreshSignal() {
+  try {
+    const [snap, log] = await Promise.all([
+      fetch('/api/signal/current').then(r => r.json()),
+      fetch('/api/signal/log?limit=40').then(r => r.json()),
+    ]);
+    const plan = snap.plan || {};
+    document.getElementById('sig-cycle').textContent =
+      'cycle ' + (plan.cycle_seconds ?? '-') + 's  ·  NS green ' + (plan.NS_green ?? '-') + 's  ·  EW green ' + (plan.EW_green ?? '-') + 's  ·  yellow ' + (plan.yellow ?? '-') + 's  ·  all-red ' + (plan.all_red ?? '-') + 's';
+    const cur = snap.current;
+    if (cur && (!sigCurrent || sigCurrent.timestamp !== cur.timestamp)) {
+      sigCurrent = cur;
+      sigPhaseStart = Date.now();
+    }
+    // Derive NS vs EW state from whichever phase matches current; the other is RED.
+    let nsState = 'RED ON', ewState = 'RED ON';
+    if (cur) {
+      if (cur.phase_name === 'NS') nsState = cur.signal_state;
+      if (cur.phase_name === 'EW') ewState = cur.signal_state;
+    }
+    function applyState(prefix, state) {
+      const wrap = document.getElementById('sig-' + prefix + '-state');
+      wrap.querySelector('.sig-light').className = 'sig-light ' + stateColorClass(state);
+      wrap.querySelector('.sig-text').textContent = state;
+    }
+    applyState('ns', nsState);
+    applyState('ew', ewState);
+    // Progress bar: time elapsed in current phase vs duration.
+    const dur = (cur && cur.duration_seconds) ? cur.duration_seconds : 1;
+    const elapsed = Math.min(dur, (Date.now() - (sigPhaseStart || Date.now())) / 1000);
+    const pct = Math.max(0, Math.min(100, (elapsed / dur) * 100));
+    const bar = document.getElementById('sig-' + (cur && cur.phase_name === 'NS' ? 'ns' : 'ew') + '-bar');
+    const other = document.getElementById('sig-' + (cur && cur.phase_name === 'NS' ? 'ew' : 'ns') + '-bar');
+    bar.style.width = pct + '%';
+    other.style.width = '0%';
+    const remain = Math.max(0, dur - elapsed);
+    document.getElementById('sig-' + (cur && cur.phase_name === 'NS' ? 'ns' : 'ew') + '-remain').textContent = ' ' + remain.toFixed(1) + 's remaining';
+    document.getElementById('sig-' + (cur && cur.phase_name === 'NS' ? 'ew' : 'ns') + '-remain').textContent = '';
+    // Event log tail
+    const logEl = document.getElementById('sig-log');
+    logEl.replaceChildren();
+    (log.events || []).slice().reverse().forEach(ev => {
+      const d = el('div', null,
+        el('span', { style: 'opacity:.6', text: ev.timestamp.split('T')[1].replace('+03:00','') + '  ' }),
+        el('span', { style: 'font-weight:600', text: ev.phase_name + ' ' }),
+        el('span', { class: stateColorClass(ev.signal_state), text: ev.signal_state }),
+      );
+      logEl.appendChild(d);
+    });
+  } catch (e) {
+    /* ignore transient failures */
+  }
+}
+setInterval(refreshSignal, 400);
+refreshSignal();
+
+// ---- Heatmap + Forecast slider ----
+function fmtScale(v) { return (v == null) ? '-' : (v >= 1 ? '+' : '') + Math.round((v - 1) * 100) + '%'; }
+let heatmap = null;
+async function loadHeatmap() {
+  const d = await fetch('/api/heatmap').then(r => r.json());
+  heatmap = d;
+  document.getElementById('hm-current').textContent = fmtTime(d.current_hour);
+  // default slider to current hour
+  const sl = document.getElementById('hm-slider');
+  if (sl.value === '10') sl.value = String(d.current_hour);
+  renderHeatmap();
+}
+function renderHeatmap() {
+  if (!heatmap) return;
+  const grid = document.getElementById('hm-grid');
+  const axis = document.getElementById('hm-axis');
+  grid.replaceChildren();
+  axis.replaceChildren();
+  // Axis: empty corner + hour tick every 2 hours
+  axis.appendChild(el('span', null));
+  heatmap.hours.forEach((h, i) => {
+    axis.appendChild(el('span', { text: (h % 2 === 0 ? String(Math.floor(h)) : '') }));
+  });
+  const selected = parseFloat(document.getElementById('hm-slider').value);
+  ['S','N','E','W'].forEach(a => {
+    const label = el('div', { class: 'hm-row-label app-' + a, text: a });
+    grid.appendChild(label);
+    heatmap.cells[a].forEach((c, i) => {
+      const cls = ['hm-cell'];
+      if (c && c.label) cls.push('hm-' + c.label);
+      if (c && c.hour === selected) cls.push('sel');
+      if (c && c.hour === heatmap.current_hour) cls.push('cur');
+      const cell = el('div', { class: cls.join(' '),
+        title: c ? (fmtTime(c.hour) + ' | ' + (c.label || '-') + ' | p=' + (c.pressure ?? '-') + ' | gmaps r=' + (c.gmaps_ratio ?? '-') + ' | ' + (c.gmaps_speed_kmh ?? '-') + ' km/h') : '' });
+      grid.appendChild(cell);
+    });
+  });
+}
+let forecastTimer = null;
+async function runForecast() {
+  const hr = parseFloat(document.getElementById('hm-slider').value);
+  document.getElementById('hm-hour').textContent = fmtTime(hr);
+  renderHeatmap();
+  clearTimeout(forecastTimer);
+  forecastTimer = setTimeout(async () => {
+    try {
+      const f = await fetch('/api/forecast?hour=' + hr).then(r => r.json());
+      const host = document.getElementById('hm-forecast');
+      host.replaceChildren();
+      const head = el('div', { style: 'font-size: 13px; margin-bottom: 8px; opacity:.8',
+        text: 'Predicted state at ' + fmtTime(f.requested_hour) + '  ·  baseline ' + fmtTime(f.baseline_hour) });
+      host.appendChild(head);
+      const tbl = el('table', null);
+      const thead = el('thead', null, el('tr', null,
+        el('th', {text:'Approach'}), el('th', {text:'Pressure'}), el('th', {text:'Class'}),
+        el('th', {text:'gmaps label'}), el('th', {text:'gmaps ratio'}), el('th', {text:'speed'}), el('th', {text:'scale vs now'}),
+      ));
+      tbl.appendChild(thead);
+      const tbody = el('tbody', null);
+      ['S','N','E','W'].forEach(a => {
+        const p = (f.predicted || {})[a] || {};
+        tbody.appendChild(el('tr', null,
+          el('td', { class: 'app-' + a }, el('strong', { text: a })),
+          el('td', { text: String(p.pressure ?? '-') }),
+          el('td', null, pill(p.label || '-')),
+          el('td', null, pill(p.gmaps_label || '-')),
+          el('td', { text: String(p.gmaps_congestion_ratio ?? '-') }),
+          el('td', { text: (p.gmaps_speed_kmh != null ? (p.gmaps_speed_kmh + ' km/h') : '-') }),
+          el('td', { text: fmtScale(p.scale_vs_now) }),
+        ));
+      });
+      tbl.appendChild(tbody);
+      host.appendChild(tbl);
+      // Webster for forecast hour
+      const rec = f.recommendation || {};
+      const cmp = rec.comparison || null;
+      if (cmp) {
+        const note = el('div', { style: 'margin-top: 10px; font-size: 13px; opacity:.9',
+          text: 'Forecast Webster: cycle ' + rec.cycle_seconds.toFixed(1) + 's  ·  NS ' + cmp.recommended.NS_green.toFixed(1) + 's  ·  EW ' + cmp.recommended.EW_green.toFixed(1) + 's  ·  delay reduction ' + (cmp.delay_reduction_pct == null ? '-' : cmp.delay_reduction_pct + '%') });
+        host.appendChild(note);
+      }
+    } catch (e) { /* ignore */ }
+  }, 150);
+}
+document.getElementById('hm-slider').addEventListener('input', runForecast);
+loadHeatmap().then(runForecast);
+
+// ---- Rolling N-hour horizon forecast ----
+async function runHorizon() {
+  const start = parseFloat(document.getElementById('hz-start').value);
+  const hours = parseFloat(document.getElementById('hz-hours').value);
+  const meta = document.getElementById('hz-meta');
+  meta.textContent = 'loading...';
+  try {
+    const f = await fetch('/api/forecast/horizon?start=' + start + '&hours=' + hours + '&step=0.5').then(r => r.json());
+    const grid = document.getElementById('hz-grid');
+    const axis = document.getElementById('hz-axis');
+    const ticks = f.ticks || [];
+    const nCols = ticks.length;
+    grid.style.gridTemplateColumns = '40px repeat(' + nCols + ', minmax(22px, 1fr))';
+    axis.style.gridTemplateColumns = '40px repeat(' + nCols + ', minmax(22px, 1fr))';
+    grid.replaceChildren();
+    axis.replaceChildren();
+    axis.appendChild(el('span', null));
+    ticks.forEach((t, i) => {
+      axis.appendChild(el('span', { text: (i % 2 === 0 ? fmtTime(t.hour) : '') }));
+    });
+    ['S','N','E','W'].forEach(a => {
+      grid.appendChild(el('div', { class: 'hm-row-label app-' + a, text: a }));
+      ticks.forEach(t => {
+        const p = (t.per_approach || {})[a] || {};
+        const cls = ['hm-cell'];
+        if (p.label) cls.push('hm-' + p.label);
+        grid.appendChild(el('div', { class: cls.join(' '),
+          title: fmtTime(t.hour) + ' | ' + (p.label || '-') + ' | p=' + (p.pressure ?? '-') + ' | gmaps=' + (p.gmaps_label || '-') + ' r=' + (p.gmaps_ratio ?? '-') + ' | scale=' + fmtScale(p.scale_vs_now) }));
+      });
+    });
+    // Cycle-seconds strip (not colored, just labels)
+    const cycleLine = ticks.map(t => fmtTime(t.hour) + ':' + (t.recommended.cycle_seconds ?? '-') + 's').slice(0, 8).join('   ');
+    document.getElementById('hz-cycle').textContent = 'Webster cycle across horizon (first 8): ' + cycleLine;
+    // Summary table with peak per-approach class
+    const host = document.getElementById('hz-table');
+    host.replaceChildren();
+    const tbl = el('table', null);
+    tbl.appendChild(el('thead', null, el('tr', null,
+      el('th', {text:'Approach'}),
+      el('th', {text:'Peak class'}),
+      el('th', {text:'Peak hour'}),
+      el('th', {text:'Max pressure'}),
+      el('th', {text:'Hours heavy+'}),
+      el('th', {text:'Hours free'}),
+    )));
+    const tbody = el('tbody', null);
+    const rank = {free:0, light:1, moderate:2, heavy:3, jam:4};
+    ['S','N','E','W'].forEach(a => {
+      let peak = null, peakHour = null, maxP = null, heavyPlus = 0, freeCnt = 0;
+      ticks.forEach(t => {
+        const p = (t.per_approach || {})[a] || {};
+        const r = (rank[p.label] ?? -1);
+        if (peak === null || r > (rank[peak] ?? -1)) { peak = p.label; peakHour = t.hour; }
+        if (p.pressure != null && (maxP === null || p.pressure > maxP)) { maxP = p.pressure; peakHour = t.hour; }
+        if (rank[p.label] >= rank.heavy) heavyPlus++;
+        if (p.label === 'free') freeCnt++;
+      });
+      tbody.appendChild(el('tr', null,
+        el('td', { class: 'app-' + a }, el('strong', { text: a })),
+        el('td', null, pill(peak || '-')),
+        el('td', { text: peakHour != null ? fmtTime(peakHour) : '-' }),
+        el('td', { text: maxP != null ? maxP.toFixed(2) : '-' }),
+        el('td', { text: String(heavyPlus) }),
+        el('td', { text: String(freeCnt) }),
+      ));
+    });
+    tbl.appendChild(tbody);
+    host.appendChild(tbl);
+    meta.textContent = nCols + ' ticks from ' + fmtTime(f.start_hour) + ' for ' + f.hours + 'h (gmaps baseline ' + fmtTime(f.baseline_hour) + ')';
+  } catch (e) {
+    meta.textContent = 'error: ' + e.message;
+  }
+}
+document.getElementById('hz-run').addEventListener('click', runHorizon);
+
+// ---- Live §6.6 events ----
+const EVENT_COLOR = {
+  congestion_class_change: '#86efac',
+  queue_spillback: '#fdba74',
+  abnormal_stopping: '#fde68a',
+  stalled_vehicle: '#bfdbfe',
+  wrong_way: '#fecaca',
+  incident: '#fecaca',
+};
+function sevColor(s) {
+  if (s === 'critical') return '#fecaca';
+  if (s === 'warning') return '#fde68a';
+  return '#86efac';
+}
+async function refreshEvents() {
+  try {
+    const d = await fetch('/api/events?limit=50').then(r => r.json());
+    const host = document.getElementById('ev-list');
+    host.replaceChildren();
+    const events = (d.events || []).slice().reverse();
+    if (events.length === 0) {
+      host.appendChild(el('div', { style: 'opacity:.55; padding: 6px 0;', text: 'no events yet (tracker is watching)' }));
+      return;
+    }
+    events.forEach(ev => {
+      const c = EVENT_COLOR[ev.event_type] || '#e6edf3';
+      const payloadBits = [];
+      const p = ev.payload || {};
+      for (const k of ['from','to','queue_count','duration_s','track_id','stationary_seconds','dot_vs_expected','expected_direction','cause']) {
+        if (p[k] !== undefined && p[k] !== null) payloadBits.push(k + '=' + p[k]);
+      }
+      const t = ev.ts ? ev.ts.split('T')[1].replace('+03:00','') : '';
+      const row = el('div', null,
+        el('span', { style: 'opacity:.6', text: t + '  ' }),
+        el('span', { style: 'color:' + sevColor(ev.severity) + '; font-weight:600', text: ev.severity + '  ' }),
+        el('span', { style: 'color:' + c + '; font-weight:600', text: ev.event_type }),
+        ev.approach ? el('span', { class: 'app-' + ev.approach, style: 'font-weight:700; margin-left:6px', text: ev.approach }) : null,
+        el('span', { style: 'opacity:.75; margin-left:8px', text: payloadBits.join('  ') }),
+      );
+      host.appendChild(row);
+    });
+  } catch (e) { /* ignore */ }
+}
+setInterval(refreshEvents, 1500);
+refreshEvents();
+document.getElementById('ev-demo').addEventListener('click', async () => {
+  try { await fetch('/api/events/_demo', { method: 'POST' }); refreshEvents(); } catch (e) { /* ignore */ }
+});
+// Kick one off after heatmap first load, seeded from current hour if available.
+setTimeout(() => {
+  if (heatmap && heatmap.current_hour != null) {
+    document.getElementById('hz-start').value = String(heatmap.current_hour);
+  }
+  runHorizon();
+}, 1200);
+</script>
+</body>
+</html>
+"""

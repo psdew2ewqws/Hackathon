@@ -1,0 +1,41 @@
+{
+  "site_id": "wadi_saqra",
+  "name": "Wadi Saqra intersection",
+  "lat": 31.966707273799933,
+  "lng": 35.88701562636417,
+  "source": {
+    "kind": "rtsp",
+    "url": "rtsp://127.0.0.1:8554/wadi_saqra",
+    "frame_width": 1920,
+    "frame_height": 1080,
+    "source_fps": 30,
+    "ingest_fps": 10
+  },
+  "video": {
+    "file": "phase3-fullstack/data/wadi_saqra_5210_1080p.mp4",
+    "original": "/home/admin1/Downloads/IMG_5210.MOV",
+    "captured_at_local": "2026-04-22T09:57:35+03:00",
+    "captured_at_utc": "2026-04-22T06:57:35Z",
+    "intended_local_hour": 10.0
+  },
+  "gmaps": {
+    "typical_ndjson": "data/research/gmaps/typical_2026-04-26.ndjson",
+    "match_local_hour": 10.0
+  },
+  "signal": {
+    "mode": "two_phase",
+    "note": "Field-observed plan: NS green opens together, then EW green opens together.",
+    "current_plan": {
+      "NS_green": 35,
+      "EW_green": 35,
+      "yellow": 3,
+      "all_red": 2
+    }
+  },
+  "approaches": {
+    "S": { "corridor": "S", "label": "South (cars heading north)" },
+    "N": { "corridor": "N", "label": "North (cars heading south)" },
+    "E": { "corridor": "E", "label": "East (cars heading west)" },
+    "W": { "corridor": "W", "label": "West (cars heading east)" }
+  }
+}

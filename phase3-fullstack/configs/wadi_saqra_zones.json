@@ -1,0 +1,35 @@
+{
+  "frame_width": 1920,
+  "frame_height": 1080,
+  "note": "Initial best-guess zones for IMG_5204.MOV at 1920x1080. Coordinates in pixels, origin top-left. Refine with interactive picker if counts look off.",
+  "zones": [
+    {
+      "approach": "S",
+      "label": "South approach",
+      "polygon": [[260, 820], [1010, 790], [1100, 1080], [90, 1080]],
+      "stop_line": [[260, 820], [1010, 790]],
+      "direction_of_travel": "up"
+    },
+    {
+      "approach": "N",
+      "label": "North approach",
+      "polygon": [[600, 430], [1220, 430], [1260, 560], [540, 560]],
+      "stop_line": [[540, 560], [1260, 560]],
+      "direction_of_travel": "down"
+    },
+    {
+      "approach": "W",
+      "label": "West approach",
+      "polygon": [[0, 460], [430, 460], [460, 680], [0, 680]],
+      "stop_line": [[430, 460], [460, 680]],
+      "direction_of_travel": "right"
+    },
+    {
+      "approach": "E",
+      "label": "East approach",
+      "polygon": [[1470, 420], [1920, 400], [1920, 640], [1470, 640]],
+      "stop_line": [[1470, 420], [1470, 640]],
+      "direction_of_travel": "left"
+    }
+  ]
+}
