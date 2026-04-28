@@ -16,20 +16,30 @@
     "original": "/home/admin1/Downloads/IMG_5210.MOV",
     "captured_at_local": "2026-04-22T09:57:35+03:00",
     "captured_at_utc": "2026-04-22T06:57:35Z",
-    "intended_local_hour": 10.0
+    "intended_local_hour": 10.0,
+    "duration_seconds": 314.933,
+    "ffmpeg_start_file": "phase3-fullstack/data/ffmpeg_start.txt"
   },
   "gmaps": {
     "typical_ndjson": "data/research/gmaps/typical_2026-04-26.ndjson",
     "match_local_hour": 10.0
   },
   "signal": {
-    "mode": "two_phase",
-    "note": "Field-observed plan: NS green opens together, then EW green opens together.",
+    "mode": "three_phase",
+    "note": "Field-observed plan: NS together, then E alone, then W alone.",
     "current_plan": {
       "NS_green": 35,
       "EW_green": 35,
+      "E_green": 35,
+      "W_green": 35,
       "yellow": 3,
       "all_red": 2
+    },
+    "video_anchor": {
+      "video_ts_seconds": 23.0,
+      "phase_name": "E",
+      "signal_state": "GREEN ON",
+      "note": "User-observed 2026-04-22: E light opens exactly at second 23 of the clip."
     }
   },
   "approaches": {

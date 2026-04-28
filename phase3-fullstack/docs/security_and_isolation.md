@@ -83,6 +83,11 @@ None of these cross an authentication boundary into an operational system.
 | `POST /api/events/_demo`          | admin      | Emits a synthetic event for UI testing only.           |
 | `GET  /api/audit/log`             | admin      | Privileged auditing trail.                             |
 | `GET  /api/system/isolation`      | viewer     | Returns the isolation posture (no sensitive fields).   |
+| `GET  /api/llm/status`            | viewer     | Reports whether the LLM advisor is configured. Never echoes the API key. |
+| `POST /api/llm/chat`              | operator   | Streams an advisor turn; opt-in egress (see §LLM advisor). |
+| `GET  /api/llm/conversations`     | operator   | Lists own conversations (admin: any, with `?all_users=1`). |
+| `GET  /api/llm/conversations/{id}`| operator   | Full transcript (admin: any user's). |
+| `DELETE /api/llm/conversations/{id}` | operator | Delete own (admin: any). Cascades messages. |
 
 All GET endpoints that surface aggregate dashboards (e.g.
 `/api/fusion`, `/api/counts`, `/api/forecast*`, `/api/recommendation`)
@@ -149,6 +154,95 @@ $ curl -s http://localhost:8000/api/system/isolation
 }
 ```
 
+## LLM advisor — opt-in egress {#llm-advisor}
+
+The dashboard ships a conversational LLM advisor as a **feature** that
+**must be activated explicitly** at deployment time. The default posture
+is no outbound calls at all.
+
+### Default posture (no key set)
+
+- `ANTHROPIC_API_KEY` is **unset** by default. Without it, the chat
+  endpoint returns `503` and no outbound network call happens. The
+  drawer toggle still renders so judges can see the feature exists; the
+  panel inside shows a "not configured" explainer.
+- `assert_no_outbound_writes.sh` continues to PASS — the advisor uses
+  only Anthropic SDK abstractions (`AsyncAnthropic`, `messages.stream`)
+  which do not match the script's `requests.post` / `httpx.post` /
+  `aiohttp.*post` / `smtplib.*` regex set. Verified after every change.
+- The `anthropic` Python package is gated behind the `[llm]` extra in
+  `pyproject.toml`. Standard installs do not pull it in.
+
+### Activated posture (`ANTHROPIC_API_KEY` set)
+
+When the operator decides to enable the advisor:
+
+```
+pip install 'traffic-intel[llm]'
+export ANTHROPIC_API_KEY=sk-ant-...
+TRAFFIC_INTEL_LLM_MODEL=claude-sonnet-4-6  # default; override to opus etc.
+TRAFFIC_INTEL_LLM_MAX_TOKENS=1024
+```
+
+The egress profile becomes:
+
+| Direction | Destination | Trigger | Carries |
+|-----------|-------------|---------|---------|
+| Out | `api.anthropic.com:443` (TLS) | An `operator+` posts to `/api/llm/chat` | System prompt, tool definitions, conversation history (incl. tool results), the new user message |
+| In | `api.anthropic.com` → us | Same | Streamed tokens, tool-use requests, usage counts |
+
+This is the **only** allowlisted egress. No other host is contacted.
+
+### Role gating
+
+`POST /api/llm/chat` is gated to `operator+`, the same tier as
+`/api/ingest/*` and `/api/history/daily`. `viewer` accounts cannot start
+chats or read conversations. `admin` can list any user's conversations
+(with `?all_users=1`) for audit.
+
+### Tool sandbox
+
+The LLM cannot mutate state. Its tools are:
+
+- 6 read-only curated tools wrapping existing endpoint logic (live state,
+  forecast, history, recommendation, incidents, signal plan).
+- 1 SQL escape hatch (`query_sqlite`) restricted to `SELECT` / `WITH ...
+  SELECT` against an allowlisted table set, with a 1000-row cap and 5s
+  timeout. The `users`, `audit_log`, `llm_conversations`, and
+  `llm_messages` tables are blocked.
+- The DB connection used by `query_sqlite` is opened with `mode=ro` so
+  even a parser bypass cannot mutate. Defense in depth.
+
+### Audit trail
+
+Every chat turn writes:
+
+- One row into `audit_log` via `_log_audit("llm.chat", ...)`.
+- One `llm_messages` row per top-level user/assistant message, with
+  `tokens_in` / `tokens_out` for cost accounting.
+- A `llm_conversations` row (one per session) updated with running
+  totals.
+
+Admins can read the full transcript via `GET /api/audit/log` plus
+`GET /api/llm/conversations/{id}`.
+
+### How to verify the default posture
+
+From a fresh checkout:
+
+```bash
+unset ANTHROPIC_API_KEY
+TRAFFIC_INTEL_JWT_SECRET=dev bash phase3-fullstack/scripts/run_full_stack.sh
+# token=$(curl -s -X POST http://localhost:8000/api/auth/login \
+#         -H 'Content-Type: application/json' \
+#         -d '{"username":"viewer","password":"viewer123"}' | jq -r .token)
+curl -s -H "Authorization: Bearer $token" http://localhost:8000/api/llm/status
+# → {"configured": false, ...}
+bash phase3-fullstack/scripts/assert_no_outbound_writes.sh
+# → [isolation] PASS
+pytest tests/phase3/test_llm_isolation.py -q
+```
+
 ## Future-proofing
 
 - A CI job can run `assert_no_outbound_writes.sh` on every PR and fail the
@@ -159,3 +253,7 @@ $ curl -s http://localhost:8000/api/system/isolation
 - If real signal-control integration is ever required, it should be a
   separate process in a separate network zone — this system stays
   strictly analytical.
+- If the LLM advisor's egress profile ever needs to change (e.g. extra
+  destinations for tool servers), update the table above **and** add a
+  test in `tests/phase3/test_llm_isolation.py` that asserts the new
+  shape, so the security story stays auditable.

@@ -234,8 +234,54 @@ def fuse(
     return out
 
 
+def _approach_arrival_rate(row: dict, cycle_seconds: float) -> float:
+    """Estimate the per-approach arrival rate in veh/min.
+
+    Uses ``demand_per_min`` (live measured crossings per bin) when traffic is
+    flowing through the approach. When the approach is currently red, that
+    field reads 0 even though cars are piling up, so we fall back to a
+    queue-based proxy: ``in_zone / cycle_seconds * 60`` — treating the queue
+    as the arrivals accumulated over one cycle. The max of the two keeps us
+    honest in both regimes.
+    """
+    demand = float(row.get("demand_per_min", 0.0) or 0.0)
+    queue = float(row.get("in_zone", 0) or 0)
+    queue_as_rate = (queue * 60.0) / max(cycle_seconds, 1.0)
+    return max(demand, queue_as_rate)
+
+
+def _phase_flow_ratio_hcm(
+    fused: dict[str, dict],
+    approaches: list[str],
+    saturation_flow_per_min: float,
+    lane_count: int,
+    cycle_seconds: float,
+) -> float:
+    """HCM-style flow ratio y = arrival_rate / (saturation_flow × lanes).
+
+    The critical lane-group per Webster: take max(y_i) across the approaches
+    that share this phase. Clamped to [0.02, 0.95] so a momentarily empty
+    intersection doesn't collapse the cycle to 10s, and so Y rarely saturates.
+
+    ``saturation_flow_per_min`` default ≈ 30 veh/min/lane (HCM 1800 veh/h/lane).
+    ``lane_count`` is per approach (not per phase).
+    """
+    capacity_per_approach = max(1.0, saturation_flow_per_min * max(lane_count, 1))
+    ys: list[float] = []
+    for a in approaches:
+        row = fused.get(a, {})
+        arrival = _approach_arrival_rate(row, cycle_seconds)
+        y = arrival / capacity_per_approach
+        ys.append(min(0.95, max(0.02, y)))
+    return max(ys) if ys else 0.02
+
+
 def _phase_flow_ratio(fused: dict[str, dict], approaches: list[str], saturation: float) -> float:
-    """Critical lane-group ratio for a phase = max(y_i) across its approaches."""
+    """Deprecated pressure-based flow ratio — retained for any legacy caller.
+
+    New code should prefer ``_phase_flow_ratio_hcm`` which is driven by measured
+    arrival rate instead of the catch-all pressure score.
+    """
     ys = [min(0.95, max(0.02, fused.get(a, {}).get("pressure", 0.0) / saturation))
           for a in approaches]
     return max(ys) if ys else 0.02
@@ -244,15 +290,20 @@ def _phase_flow_ratio(fused: dict[str, dict], approaches: list[str], saturation:
 def webster_two_phase(
     fused: dict[str, dict],
     current_plan: dict | None = None,
-    saturation: float = 25.0,
+    saturation: float = 30.0,
     yellow_per_phase: float = 3.0,
     all_red_per_phase: float = 2.0,
     min_green: float = 10.0,
     max_green: float = 90.0,
+    lane_count: int = 2,
 ) -> dict:
     """
     Webster for a 2-phase signal: NS (N+S open together) and EW (E+W together).
     Returns recommended cycle + NS/EW greens and a comparison vs ``current_plan``.
+
+    ``saturation`` is the saturation flow per lane in veh/min (HCM default ≈ 30).
+    ``lane_count`` is per approach. With defaults each approach has capacity
+    60 veh/min.
 
     ``current_plan`` example (matches the real Wadi Saqra signal):
         {"NS_green": 35, "EW_green": 35, "yellow": 3, "all_red": 2}
@@ -260,8 +311,20 @@ def webster_two_phase(
     lost_per_phase = yellow_per_phase + all_red_per_phase  # ≈ 5s
     L = 2 * lost_per_phase
 
-    y_NS = _phase_flow_ratio(fused, ["N", "S"], saturation)
-    y_EW = _phase_flow_ratio(fused, ["E", "W"], saturation)
+    # Seed cycle estimate from the current plan (if provided) so the
+    # queue→arrival-rate proxy uses a realistic horizon.
+    if current_plan:
+        seed_cycle = (
+            float(current_plan.get("NS_green", 35))
+            + float(current_plan.get("EW_green", 35))
+            + 2 * (float(current_plan.get("yellow", yellow_per_phase))
+                   + float(current_plan.get("all_red", all_red_per_phase)))
+        )
+    else:
+        seed_cycle = 80.0
+
+    y_NS = _phase_flow_ratio_hcm(fused, ["N", "S"], saturation, lane_count, seed_cycle)
+    y_EW = _phase_flow_ratio_hcm(fused, ["E", "W"], saturation, lane_count, seed_cycle)
     Y = y_NS + y_EW
 
     if Y >= 0.95:
@@ -344,9 +407,22 @@ def webster_two_phase(
             return 0.5 * c * r * r / denom
         d_cur = _delay(cur_cycle, cur_NS, y_NS) + _delay(cur_cycle, cur_EW, y_EW)
         d_rec = _delay(cycle_recomputed, g_NS, y_NS) + _delay(cycle_recomputed, g_EW, y_EW)
-        improvement = None
-        if d_cur > 0:
-            improvement = round(100.0 * (d_cur - d_rec) / d_cur, 1)
+        # If Webster's formula-optimal plan performs worse than the field plan
+        # (happens near saturation where the formula-optimal cycle is very
+        # long and the uniform-delay term penalises long cycles for minor
+        # movements), report the field plan as the recommendation and flag
+        # near_saturation. This keeps the dashboard honest — we never
+        # "recommend" a plan we can prove is worse.
+        near_saturation = Y >= 0.85 or d_rec >= d_cur
+        if near_saturation and d_rec >= d_cur:
+            rec_NS, rec_EW, rec_cycle, d_rec_out = cur_NS, cur_EW, cur_cycle, d_cur
+            improvement = 0.0
+        else:
+            rec_NS, rec_EW, rec_cycle, d_rec_out = g_NS, g_EW, cycle_recomputed, d_rec
+            improvement = None
+            if d_cur > 0:
+                improvement = round(100.0 * (d_cur - d_rec) / d_cur, 1)
+        out["near_saturation"] = near_saturation
         out["comparison"] = {
             "current": {
                 "NS_green": cur_NS,
@@ -357,14 +433,206 @@ def webster_two_phase(
                 "uniform_delay_sec_per_veh": round(d_cur, 2),
             },
             "recommended": {
-                "NS_green": round(g_NS, 1),
-                "EW_green": round(g_EW, 1),
+                "NS_green": round(rec_NS, 1),
+                "EW_green": round(rec_EW, 1),
                 "yellow": round(yellow_per_phase, 1),
                 "all_red": round(all_red_per_phase, 1),
-                "cycle_seconds": round(cycle_recomputed, 1),
-                "uniform_delay_sec_per_veh": round(d_rec, 2),
+                "cycle_seconds": round(rec_cycle, 1),
+                "uniform_delay_sec_per_veh": round(d_rec_out, 2),
             },
             "delay_reduction_pct": improvement,
+            "near_saturation": near_saturation,
+        }
+
+    return out
+
+
+def webster_three_phase(
+    fused: dict[str, dict],
+    current_plan: dict | None = None,
+    saturation: float = 30.0,
+    yellow_per_phase: float = 3.0,
+    all_red_per_phase: float = 2.0,
+    min_green: float = 10.0,
+    max_green: float = 90.0,
+    lane_count: int = 2,
+) -> dict:
+    """
+    Webster for a 3-phase signal: NS (N+S together), then E alone, then W alone.
+    Mirrors ``webster_two_phase`` but with a third phase and 3× lost-time.
+
+    ``current_plan`` example matching the field-observed Wadi Saqra light:
+        {"NS_green": 35, "E_green": 35, "W_green": 35, "yellow": 3, "all_red": 2}
+    """
+    lost_per_phase = yellow_per_phase + all_red_per_phase  # ≈ 5s
+    L = 3 * lost_per_phase  # 3 phases ⇒ 3 lost intervals per cycle
+
+    if current_plan:
+        seed_cycle = (
+            float(current_plan.get("NS_green", 35))
+            + float(current_plan.get("E_green", current_plan.get("EW_green", 35)))
+            + float(current_plan.get("W_green", current_plan.get("EW_green", 35)))
+            + 3 * (float(current_plan.get("yellow", yellow_per_phase))
+                   + float(current_plan.get("all_red", all_red_per_phase)))
+        )
+    else:
+        seed_cycle = 120.0
+
+    y_NS = _phase_flow_ratio_hcm(fused, ["N", "S"], saturation, lane_count, seed_cycle)
+    y_E = _phase_flow_ratio_hcm(fused, ["E"], saturation, lane_count, seed_cycle)
+    y_W = _phase_flow_ratio_hcm(fused, ["W"], saturation, lane_count, seed_cycle)
+    Y = y_NS + y_E + y_W
+
+    if Y >= 0.95:
+        cycle = 180.0
+    else:
+        cycle = (1.5 * L + 5.0) / (1.0 - Y)
+    cycle = max(40.0, min(180.0, cycle))
+    effective_green = cycle - L
+
+    if Y > 0:
+        g_NS = (y_NS / Y) * effective_green
+        g_E = (y_E / Y) * effective_green
+        g_W = (y_W / Y) * effective_green
+    else:
+        g_NS = g_E = g_W = effective_green / 3
+
+    g_NS = min(max_green, max(min_green, g_NS))
+    g_E = min(max_green, max(min_green, g_E))
+    g_W = min(max_green, max(min_green, g_W))
+    cycle_recomputed = g_NS + g_E + g_W + L
+
+    per_phase_detail = {
+        "NS": {
+            "green_seconds": round(g_NS, 1),
+            "flow_ratio": round(y_NS, 3),
+            "approaches": {
+                a: {
+                    "pressure": fused.get(a, {}).get("pressure", 0.0),
+                    "demand_per_min": fused.get(a, {}).get("demand_per_min", 0.0),
+                    "in_zone": fused.get(a, {}).get("in_zone", 0),
+                }
+                for a in ("N", "S")
+            },
+        },
+        "E": {
+            "green_seconds": round(g_E, 1),
+            "flow_ratio": round(y_E, 3),
+            "approaches": {
+                "E": {
+                    "pressure": fused.get("E", {}).get("pressure", 0.0),
+                    "demand_per_min": fused.get("E", {}).get("demand_per_min", 0.0),
+                    "in_zone": fused.get("E", {}).get("in_zone", 0),
+                }
+            },
+        },
+        "W": {
+            "green_seconds": round(g_W, 1),
+            "flow_ratio": round(y_W, 3),
+            "approaches": {
+                "W": {
+                    "pressure": fused.get("W", {}).get("pressure", 0.0),
+                    "demand_per_min": fused.get("W", {}).get("demand_per_min", 0.0),
+                    "in_zone": fused.get("W", {}).get("in_zone", 0),
+                }
+            },
+        },
+    }
+
+    def _gof(a: str) -> float:
+        if a in ("N", "S"):
+            return g_NS
+        if a == "E":
+            return g_E
+        return g_W
+
+    def _yof(a: str) -> float:
+        if a in ("N", "S"):
+            return y_NS
+        if a == "E":
+            return y_E
+        return y_W
+
+    out = {
+        "mode": "three_phase",
+        "cycle_seconds": round(cycle_recomputed, 1),
+        "lost_time_seconds": round(L, 1),
+        "flow_ratio_total": round(Y, 3),
+        "phases": per_phase_detail,
+        "per_approach": {
+            a: {
+                "green_seconds": round(_gof(a), 1),
+                "flow_ratio": round(_yof(a), 3),
+                "pressure": fused.get(a, {}).get("pressure", 0.0),
+            }
+            for a in ("N", "S", "E", "W")
+        },
+    }
+
+    if current_plan:
+        cur_NS = float(current_plan.get("NS_green", 35))
+        # Accept either split (E_green/W_green) or the legacy EW_green (halved).
+        if "E_green" in current_plan or "W_green" in current_plan:
+            cur_E = float(current_plan.get("E_green", 35))
+            cur_W = float(current_plan.get("W_green", 35))
+        else:
+            ew = float(current_plan.get("EW_green", 35))
+            cur_E = cur_W = ew
+        cur_yellow = float(current_plan.get("yellow", yellow_per_phase))
+        cur_allred = float(current_plan.get("all_red", all_red_per_phase))
+        cur_cycle = cur_NS + cur_E + cur_W + 3 * (cur_yellow + cur_allred)
+
+        def _delay(c: float, g_phase: float, y_phase: float) -> float:
+            if y_phase <= 0 or g_phase <= 0:
+                return 0.0
+            r = 1 - g_phase / c
+            x = min(0.98, y_phase * c / g_phase)
+            denom = max(1e-3, 1 - (g_phase / c) * x)
+            return 0.5 * c * r * r / denom
+
+        d_cur = (
+            _delay(cur_cycle, cur_NS, y_NS)
+            + _delay(cur_cycle, cur_E, y_E)
+            + _delay(cur_cycle, cur_W, y_W)
+        )
+        d_rec = (
+            _delay(cycle_recomputed, g_NS, y_NS)
+            + _delay(cycle_recomputed, g_E, y_E)
+            + _delay(cycle_recomputed, g_W, y_W)
+        )
+        near_saturation = Y >= 0.85 or d_rec >= d_cur
+        if near_saturation and d_rec >= d_cur:
+            rec_NS, rec_E, rec_W = cur_NS, cur_E, cur_W
+            rec_cycle, d_rec_out = cur_cycle, d_cur
+            improvement = 0.0
+        else:
+            rec_NS, rec_E, rec_W = g_NS, g_E, g_W
+            rec_cycle, d_rec_out = cycle_recomputed, d_rec
+            improvement = None
+            if d_cur > 0:
+                improvement = round(100.0 * (d_cur - d_rec) / d_cur, 1)
+        out["near_saturation"] = near_saturation
+        out["comparison"] = {
+            "current": {
+                "NS_green": cur_NS,
+                "E_green": cur_E,
+                "W_green": cur_W,
+                "yellow": cur_yellow,
+                "all_red": cur_allred,
+                "cycle_seconds": round(cur_cycle, 1),
+                "uniform_delay_sec_per_veh": round(d_cur, 2),
+            },
+            "recommended": {
+                "NS_green": round(rec_NS, 1),
+                "E_green": round(rec_E, 1),
+                "W_green": round(rec_W, 1),
+                "yellow": round(yellow_per_phase, 1),
+                "all_red": round(all_red_per_phase, 1),
+                "cycle_seconds": round(rec_cycle, 1),
+                "uniform_delay_sec_per_veh": round(d_rec_out, 2),
+            },
+            "delay_reduction_pct": improvement,
+            "near_saturation": near_saturation,
         }
 
     return out

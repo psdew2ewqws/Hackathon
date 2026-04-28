@@ -134,6 +134,38 @@ CREATE TABLE IF NOT EXISTS system_metrics (
 );
 CREATE INDEX IF NOT EXISTS idx_metrics_module_ts ON system_metrics(module, ts);
 
+-- LLM advisor (opt-in feature, gated by ANTHROPIC_API_KEY at runtime).
+-- Tables exist regardless of whether the feature is activated, so audit
+-- queries don't have to branch.
+CREATE TABLE IF NOT EXISTS llm_conversations (
+  id                TEXT PRIMARY KEY,
+  user_id           INTEGER NOT NULL,
+  username          TEXT NOT NULL,
+  site_id           TEXT,
+  created_at        TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  updated_at        TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  title             TEXT,
+  model             TEXT NOT NULL,
+  total_tokens_in   INTEGER NOT NULL DEFAULT 0,
+  total_tokens_out  INTEGER NOT NULL DEFAULT 0,
+  FOREIGN KEY (user_id) REFERENCES users(id),
+  FOREIGN KEY (site_id) REFERENCES sites(site_id)
+);
+CREATE INDEX IF NOT EXISTS idx_llm_conv_user ON llm_conversations(user_id, updated_at DESC);
+
+CREATE TABLE IF NOT EXISTS llm_messages (
+  id              INTEGER PRIMARY KEY AUTOINCREMENT,
+  conversation_id TEXT NOT NULL,
+  turn_index      INTEGER NOT NULL,
+  ts              TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  role            TEXT NOT NULL CHECK (role IN ('user','assistant')),
+  content         TEXT NOT NULL,                -- plain text, or JSON array of Anthropic content blocks
+  tokens_in       INTEGER,
+  tokens_out      INTEGER,
+  FOREIGN KEY (conversation_id) REFERENCES llm_conversations(id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_llm_msg_conv ON llm_messages(conversation_id, ts);
+
 -- Bootstrap the default site used by the PoC. Idempotent via INSERT OR IGNORE.
 INSERT OR IGNORE INTO sites (site_id, name, lat, lng)
 VALUES ('wadi_saqra', 'Wadi Saqra intersection', 31.966707273799933, 35.88701562636417);

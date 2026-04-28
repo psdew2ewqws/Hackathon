@@ -34,6 +34,18 @@ dev = [
     "pytest-cov>=5.0",
     "ruff>=0.4",
 ]
+llm = [
+    # LLM advisor (opt-in via ANTHROPIC_API_KEY at runtime).
+    # Without this extra installed and the env var set, the chat endpoint
+    # returns 503 and no outbound calls happen — see §7.7.
+    "anthropic>=0.40",
+]
+kafka = [
+    "aiokafka>=0.11",
+]
+rabbitmq = [
+    "aio-pika>=9.4",
+]
 
 [project.scripts]
 sandbox-fetch        = "traffic_intel_sandbox.ingest.youtube_fetch:main"
@@ -58,6 +70,7 @@ where = ["phase1-sandbox/src", "phase2-feasibility/src", "phase3-fullstack/src"]
 [tool.pytest.ini_options]
 testpaths = ["phase1-sandbox/tests", "phase2-feasibility/tests", "tests/phase3"]
 addopts = "-ra --strict-markers"
+asyncio_mode = "auto"
 markers = [
     "requires_stream: test needs a live RTSP stream",
     "requires_network: test needs external network",

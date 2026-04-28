@@ -48,7 +48,7 @@ export function SignalPage() {
     );
   }
 
-  const delta = cmp.delay_reduction_pct;
+  const delta = cmp.delay_reduction_pct ?? 0;
   const deltaColor = delta >= 0 ? '#66ff88' : '#ff7a7a';
 
   return (
@@ -102,8 +102,8 @@ export function SignalPage() {
         />
         <BarCompare
           label="EW green"
-          current={cmp.current.EW_green}
-          recommended={cmp.recommended.EW_green}
+          current={cmp.current.EW_green ?? 0}
+          recommended={cmp.recommended.EW_green ?? 0}
         />
         <div style={{ marginTop: 14, fontSize: 13, opacity: 0.85 }}>
           Y = {rec.recommendation.flow_ratio_total.toFixed(2)}
@@ -142,7 +142,7 @@ function PlanColumn({
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
         <StatBlock label="NS green" value={`${plan.NS_green.toFixed(1)}s`} accent={accent} />
-        <StatBlock label="EW green" value={`${plan.EW_green.toFixed(1)}s`} accent={accent} />
+        <StatBlock label="EW green" value={`${(plan.EW_green ?? 0).toFixed(1)}s`} accent={accent} />
         <StatBlock label="Yellow" value={`${plan.yellow.toFixed(1)}s`} />
         <StatBlock label="All-red" value={`${plan.all_red.toFixed(1)}s`} />
         <StatBlock label="Cycle" value={`${plan.cycle_seconds.toFixed(1)}s`} />

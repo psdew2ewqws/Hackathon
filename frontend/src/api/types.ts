@@ -86,9 +86,14 @@ export interface FusionResponse {
   fused: Record<Approach, FusedRow>;
 }
 
+// A plan row can describe either the 2-phase (EW_green) or 3-phase
+// (E_green/W_green) signal model; the backend sets the appropriate fields
+// based on the site config's ``signal.mode`` / ``video_anchor``.
 export interface PlanComparison {
   NS_green: number;
-  EW_green: number;
+  EW_green?: number;
+  E_green?: number;
+  W_green?: number;
   yellow: number;
   all_red: number;
   cycle_seconds: number;
@@ -96,19 +101,18 @@ export interface PlanComparison {
 }
 
 export interface Recommendation {
-  mode: string;
+  mode: string;  // "two_phase" | "three_phase"
   cycle_seconds: number;
   lost_time_seconds: number;
   flow_ratio_total: number;
-  phases: {
-    NS: { green_seconds: number; flow_ratio: number };
-    EW: { green_seconds: number; flow_ratio: number };
-  };
+  phases: Record<string, { green_seconds: number; flow_ratio: number }>;
   comparison: {
     current: PlanComparison;
     recommended: PlanComparison;
-    delay_reduction_pct: number;
+    delay_reduction_pct: number | null;
+    near_saturation?: boolean;
   };
+  near_saturation?: boolean;
 }
 
 export interface RecommendationResponse {

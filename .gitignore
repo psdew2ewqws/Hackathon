@@ -84,3 +84,4 @@ data/ingest_state.json
 data/calibration_pack/
 phase3-fullstack/data/
 phase3-fullstack/bin/mediamtx
+.gstack/

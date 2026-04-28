@@ -110,6 +110,10 @@ class EventEngine:
         self._fp = None
         self._snapshot_dir = snapshot_dir
         self._snapshot_provider = snapshot_provider
+        # Cache the last successfully-written snapshot_uri so events emitted
+        # when the provider is momentarily unavailable still have a visual
+        # pointer (flagged with snapshot_stale=True on the payload).
+        self._last_snapshot_uri: str | None = None
         if ndjson_path:
             ndjson_path.parent.mkdir(parents=True, exist_ok=True)
             # Seed the counter from the existing NDJSON so new events never
@@ -164,14 +168,21 @@ class EventEngine:
             except Exception:
                 LOG.exception("snapshot_provider failed")
         snapshot_uri = None
+        snapshot_stale = False
         if snapshot_jpeg and self._snapshot_dir:
             try:
                 self._snapshot_dir.mkdir(parents=True, exist_ok=True)
                 p = self._snapshot_dir / f"{event_id}.jpg"
                 p.write_bytes(snapshot_jpeg)
                 snapshot_uri = f"/event_media/{p.name}"
+                self._last_snapshot_uri = snapshot_uri
             except Exception:
                 LOG.exception("failed to write event snapshot")
+        if snapshot_uri is None and self._last_snapshot_uri is not None:
+            # Provider didn't give us a fresh frame — reuse the last one we
+            # persisted so the UI still has a reference image, and flag it.
+            snapshot_uri = self._last_snapshot_uri
+            snapshot_stale = True
         record = {
             "ts": now.isoformat(timespec="milliseconds"),
             "event_id": event_id,
@@ -182,6 +193,7 @@ class EventEngine:
             "payload": payload,
             "snapshot_hint": snapshot or {},
             "snapshot_uri": snapshot_uri,
+            "snapshot_stale": snapshot_stale,
         }
         with self._lock:
             self._buffer.append(record)
@@ -226,6 +238,7 @@ class EventEngine:
                 if (bin_end - cs.pending_since) >= CONGESTION_HYSTERESIS_S:
                     direction = ("up" if _CLASS_RANK.get(cls, 0) > _CLASS_RANK.get(cs.last_label, 0)
                                  else "down")
+                    queue_count = int(in_zone.get(approach, 0) or 0)
                     self._emit(
                         "congestion_class_change",
                         approach=approach,
@@ -237,6 +250,8 @@ class EventEngine:
                             "direction": direction,
                             "pressure": state.get("pressure"),
                             "gmaps_label": state.get("gmaps_label"),
+                            "queue_count": queue_count,
+                            "queue_length_m": round(queue_count * 7.0, 1),
                         },
                         snapshot={"bin_end_ts": bin_end},
                     )
@@ -258,6 +273,7 @@ class EventEngine:
                         confidence=0.9,
                         payload={
                             "queue_count": int(count),
+                            "queue_length_m": round(int(count) * 7.0, 1),
                             "threshold": SPILLBACK_QUEUE_THRESHOLD,
                             "duration_s": round(bin_end - sb.above_since, 1),
                         },

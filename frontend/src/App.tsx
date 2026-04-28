@@ -1,5 +1,6 @@
 import { BrowserRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { Nav } from './components/Nav';
+import { AdvisorDrawer } from './components/AdvisorDrawer';
 import { AuthProvider } from './auth/AuthContext';
 import { RequireAuth } from './auth/RequireAuth';
 import { ForecastPage } from './pages/Forecast';
@@ -19,6 +20,7 @@ function Shell({ children }: { children: React.ReactNode }) {
     <div style={{ minHeight: '100vh', background: '#0b0f14', color: '#e6edf3' }}>
       {!hideNav && <Nav />}
       {children}
+      {!hideNav && <AdvisorDrawer />}
     </div>
   );
 }

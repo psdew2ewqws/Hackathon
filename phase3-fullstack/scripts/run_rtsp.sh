@@ -31,6 +31,11 @@ if ! ss -ltn 2>/dev/null | grep -q ':8554'; then
 fi
 
 echo "[run_rtsp] pushing loop: ${VIDEO} -> rtsp://127.0.0.1:8554/wadi_saqra"
+# Record the ffmpeg start wall-clock (seconds since epoch, float). The signal
+# simulator reads this so its phase transitions stay locked to the video.
+# Written atomically so a partial read never happens.
+printf '%s' "$(date +%s.%N)" > "${ROOT}/data/ffmpeg_start.txt.tmp"
+mv "${ROOT}/data/ffmpeg_start.txt.tmp" "${ROOT}/data/ffmpeg_start.txt"
 exec ffmpeg -hide_banner -loglevel warning \
   -re -stream_loop -1 -i "${VIDEO}" \
   -c:v copy -an -f rtsp -rtsp_transport tcp \

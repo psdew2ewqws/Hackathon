@@ -372,7 +372,7 @@ function Legend() {
 function ForecastPlan({ forecast }: { forecast: ForecastResponse }) {
   const cmp = forecast.recommendation?.comparison;
   if (!cmp) return null;
-  const delta = cmp.delay_reduction_pct;
+  const delta = cmp.delay_reduction_pct ?? 0;
   const deltaColor = delta >= 0 ? '#66ff88' : '#ff7a7a';
   return (
     <div
@@ -431,14 +431,14 @@ function ForecastPlan({ forecast }: { forecast: ForecastResponse }) {
           <tr>
             <td style={td}>Current (field)</td>
             <td style={td}>{cmp.current.NS_green.toFixed(1)}s</td>
-            <td style={td}>{cmp.current.EW_green.toFixed(1)}s</td>
+            <td style={td}>{(cmp.current.EW_green ?? 0).toFixed(1)}s</td>
             <td style={td}>{cmp.current.cycle_seconds.toFixed(1)}s</td>
             <td style={td}>{cmp.current.uniform_delay_sec_per_veh.toFixed(2)}</td>
           </tr>
           <tr>
             <td style={{ ...td, color: '#66ff88', fontWeight: 600 }}>Predicted</td>
             <td style={td}>{cmp.recommended.NS_green.toFixed(1)}s</td>
-            <td style={td}>{cmp.recommended.EW_green.toFixed(1)}s</td>
+            <td style={td}>{(cmp.recommended.EW_green ?? 0).toFixed(1)}s</td>
             <td style={td}>{cmp.recommended.cycle_seconds.toFixed(1)}s</td>
             <td style={td}>{cmp.recommended.uniform_delay_sec_per_veh.toFixed(2)}</td>
           </tr>
