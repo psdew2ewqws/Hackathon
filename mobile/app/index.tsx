@@ -1,32 +1,24 @@
 import { useState } from "react";
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useMutation } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { Stack } from "expo-router";
 
 import { PlaceSearchInput } from "../src/components/PlaceSearchInput";
 import { MapPicker } from "../src/components/MapPicker";
+import { ArriveByPicker } from "../src/components/ArriveByPicker";
 import {
   predictDeparture,
   type PlaceDetails,
   type PredictDepartureResponse,
 } from "../src/services/api";
 import { getDeviceId } from "../src/store/deviceId";
+import { roundUpTo5Min, toLocalDateTimeString } from "../src/lib/time";
 
 const DEFAULT_ARRIVE_BY_OFFSET_MIN = 120;
 
-/**
- * Returns "YYYY-MM-DDTHH:MM" in the user's *local* timezone, because that's
- * how an HTML <input type="datetime-local"> (and a plain text input parsed
- * via `new Date(...)`) interpret a string with no timezone suffix.
- */
 function defaultArriveBy(): string {
-  const d = new Date(Date.now() + DEFAULT_ARRIVE_BY_OFFSET_MIN * 60_000);
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return (
-    `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}` +
-    `T${pad(d.getHours())}:${pad(d.getMinutes())}`
-  );
+  return toLocalDateTimeString(roundUpTo5Min(new Date(Date.now() + DEFAULT_ARRIVE_BY_OFFSET_MIN * 60_000)));
 }
 
 export default function Home() {
@@ -71,14 +63,7 @@ export default function Home() {
         onChange={setDest}
       />
 
-      <Text style={styles.label}>{t("home.arriveByLabel")}</Text>
-      <TextInput
-        style={styles.input}
-        value={arriveBy}
-        onChangeText={setArriveBy}
-        placeholder="YYYY-MM-DDTHH:MM"
-        placeholderTextColor="#5C6373"
-      />
+      <ArriveByPicker value={arriveBy} onChange={setArriveBy} />
 
       <Pressable
         style={[styles.button, !canSubmit && styles.buttonDisabled]}
@@ -133,15 +118,6 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#0F1115" },
   content: { padding: 24, paddingBottom: 64 },
   tagline: { color: "#8B95A8", fontSize: 16, marginBottom: 8 },
-  label: { color: "#8B95A8", fontSize: 13, marginTop: 12, marginBottom: 4 },
-  input: {
-    color: "#fff",
-    backgroundColor: "#1A1F29",
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    borderRadius: 8,
-    fontSize: 16,
-  },
   button: {
     marginTop: 20,
     backgroundColor: "#3B82F6",
