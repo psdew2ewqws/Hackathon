@@ -1,4 +1,4 @@
-import type { FastifyInstance } from "fastify";
+import type { FastifyPluginAsyncZod } from "fastify-type-provider-zod";
 import { z } from "zod";
 import { findOptimalDeparture } from "../services/optimizer.js";
 
@@ -32,7 +32,7 @@ const Response = z.object({
   source: z.literal("live"),
 });
 
-export async function predictDepartureRoutes(app: FastifyInstance) {
+export const predictDepartureRoutes: FastifyPluginAsyncZod = async (app) => {
   app.post(
     "/predict-departure",
     {
@@ -67,4 +67,4 @@ export async function predictDepartureRoutes(app: FastifyInstance) {
       };
     },
   );
-}
+};

@@ -1,7 +1,7 @@
-import type { FastifyInstance } from "fastify";
+import type { FastifyPluginAsyncZod } from "fastify-type-provider-zod";
 import { z } from "zod";
 
-export async function healthRoutes(app: FastifyInstance) {
+export const healthRoutes: FastifyPluginAsyncZod = async (app) => {
   app.get(
     "/health",
     {
@@ -21,4 +21,4 @@ export async function healthRoutes(app: FastifyInstance) {
       now: new Date().toISOString(),
     }),
   );
-}
+};
