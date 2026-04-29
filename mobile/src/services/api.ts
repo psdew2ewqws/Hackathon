@@ -38,6 +38,18 @@ export async function placeDetails(placeId: string, sessionToken: string): Promi
   return (await res.json()) as PlaceDetails;
 }
 
+export interface AppConfig {
+  googleMapsBrowserKey: string;
+  ammanCenter: LatLng;
+  defaultZoom: number;
+}
+
+export async function fetchConfig(): Promise<AppConfig> {
+  const res = await fetch(`${BASE}/v1/config`);
+  if (!res.ok) throw new Error(`config ${res.status}`);
+  return (await res.json()) as AppConfig;
+}
+
 export function staticMapUrl(origin: LatLng, dest: LatLng, width = 640, height = 320): string {
   const url = new URL(`${BASE}/v1/static-map`);
   url.searchParams.set("origin", `${origin.lat},${origin.lng}`);

@@ -1,13 +1,13 @@
 import { useState } from "react";
-import { ActivityIndicator, Image, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { useMutation } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { Stack } from "expo-router";
 
 import { PlaceSearchInput } from "../src/components/PlaceSearchInput";
+import { MapPicker } from "../src/components/MapPicker";
 import {
   predictDeparture,
-  staticMapUrl,
   type PlaceDetails,
   type PredictDepartureResponse,
 } from "../src/services/api";
@@ -43,32 +43,24 @@ export default function Home() {
   });
 
   return (
-    <View style={styles.container}>
+    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <Stack.Screen options={{ title: t("appName") }} />
       <Text style={styles.tagline}>{t("home.tagline")}</Text>
 
+      <MapPicker origin={origin} dest={dest} onOriginChange={setOrigin} onDestChange={setDest} />
+
       <PlaceSearchInput
         label={t("home.originLabel")}
-        placeholder="Type a place in Amman…"
+        placeholder="Or type a place in Amman…"
         value={origin}
         onChange={setOrigin}
       />
       <PlaceSearchInput
         label={t("home.destLabel")}
-        placeholder="Type a place in Amman…"
+        placeholder="Or type a place in Amman…"
         value={dest}
         onChange={setDest}
       />
-
-      {origin && dest && (
-        <View style={styles.mapWrap}>
-          <Image
-            source={{ uri: staticMapUrl(origin.location, dest.location, 640, 280) }}
-            style={styles.map}
-            resizeMode="cover"
-          />
-        </View>
-      )}
 
       <Text style={styles.label}>{t("home.arriveByLabel")}</Text>
       <TextInput
@@ -90,7 +82,7 @@ export default function Home() {
       {mut.isPending && <ActivityIndicator style={{ marginTop: 16 }} color="#fff" />}
       {mut.isError && <Text style={styles.error}>{(mut.error as Error).message}</Text>}
       {mut.data && <Result data={mut.data} arriveBy={arriveBy} />}
-    </View>
+    </ScrollView>
   );
 }
 
@@ -129,7 +121,8 @@ function formatTime(d: Date): string {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 24, backgroundColor: "#0F1115" },
+  container: { flex: 1, backgroundColor: "#0F1115" },
+  content: { padding: 24, paddingBottom: 64 },
   tagline: { color: "#8B95A8", fontSize: 16, marginBottom: 8 },
   label: { color: "#8B95A8", fontSize: 13, marginTop: 12, marginBottom: 4 },
   input: {
@@ -160,11 +153,4 @@ const styles = StyleSheet.create({
   resultSub: { color: "#A8B3C5", fontSize: 14, marginTop: 8, textAlign: "center" },
   resultMeta: { color: "#5C6373", fontSize: 11, marginTop: 12 },
   error: { color: "#F87171", marginTop: 16 },
-  mapWrap: {
-    marginTop: 12,
-    borderRadius: 12,
-    overflow: "hidden",
-    backgroundColor: "#1A1F29",
-  },
-  map: { width: "100%", height: 200 },
 });
