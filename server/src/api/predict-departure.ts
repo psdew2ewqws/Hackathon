@@ -12,7 +12,7 @@ const Body = z.object({
   dest: LatLng,
   arriveBy: z.string().datetime(),
   windowMinutes: z.number().int().min(15).max(180).default(90),
-  budget: z.number().int().min(1).max(10).default(8),
+  budget: z.number().int().min(1).max(12).default(10),
 });
 
 const Candidate = z.object({

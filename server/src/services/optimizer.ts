@@ -37,20 +37,26 @@ export interface OptimizeResult {
 const COARSE_STEP_MIN = 15;
 const REFINE_RADIUS_MIN = 7;
 const NOW_BUFFER_MIN = 2; // Routes API rejects departure_time in the past
-const PHI = (1 + Math.sqrt(5)) / 2;
 
 /**
- * Comparator for two feasible candidates. We prefer:
- *   1. shorter duration when the difference is meaningful (>= 60s),
- *   2. otherwise the LATER departure (less wait at destination).
- * This matches the user's actual goal: "skip the traffic, but don't make me
- * leave hours early when traffic is the same anyway."
+ * Tolerance band around the fastest feasible slot. We accept any slot whose
+ * duration is within (TOLERANCE_PCT) OR (TOLERANCE_BASE_SEC) of the minimum,
+ * whichever is more permissive. Among acceptable slots, we pick the LATEST
+ * departure — minimizing wait time at destination while still meaningfully
+ * avoiding traffic spikes.
+ *
+ * Examples:
+ *  - Sunday rush: 17 vs 22 min spread. Threshold = 20.4 min. Acceptable
+ *    slots = those at ≤ 20 min. Latest acceptable ≈ 8:00. Arrive ~36 min
+ *    early instead of 69.
+ *  - Friday weekend: 15-16 min everywhere. All slots acceptable. Latest
+ *    feasible wins (~8:30-8:44), arriving close to the deadline.
  */
-const TIE_THRESHOLD_SEC = 60;
-function isBetter(a: DepartureCandidate, b: DepartureCandidate): boolean {
-  if (a.durationSec < b.durationSec - TIE_THRESHOLD_SEC) return true;
-  if (a.durationSec > b.durationSec + TIE_THRESHOLD_SEC) return false;
-  return a.depart > b.depart;
+const TOLERANCE_PCT = 0.20;
+const TOLERANCE_BASE_SEC = 3 * 60;
+
+function acceptableThresholdSec(minDurationSec: number): number {
+  return Math.max(minDurationSec * (1 + TOLERANCE_PCT), minDurationSec + TOLERANCE_BASE_SEC);
 }
 
 export async function findOptimalDeparture(req: OptimizeRequest): Promise<OptimizeResult> {
@@ -111,28 +117,27 @@ export async function findOptimalDeparture(req: OptimizeRequest): Promise<Optimi
     };
   }
 
-  // Pick the best feasible coarse slot as the refinement seed
-  // (shortest duration, with later-departure as tiebreaker).
-  const seed = feasible.reduce((best, c) => (isBetter(c, best) ? c : best));
+  // Compute the acceptability threshold from the coarse data.
+  const minDur = Math.min(...feasible.map((c) => c.durationSec));
+  const threshold = acceptableThresholdSec(minDur);
+  const acceptable = feasible.filter((c) => c.durationSec <= threshold);
 
-  // Golden-section refinement around the seed at 1-min granularity
-  let lo = addMinutes(seed.depart, -REFINE_RADIUS_MIN);
-  let hi = addMinutes(seed.depart, REFINE_RADIUS_MIN);
-  if (lo < windowStart) lo = windowStart;
-  if (hi > windowEnd) hi = windowEnd;
+  // Seed = latest acceptable coarse slot (minimizes wait without hitting peak traffic).
+  const seed = acceptable.reduce((best, c) => (c.depart > best.depart ? c : best));
 
+  // Refinement: walk forward minute-by-minute from the seed, stopping when
+  // duration exits the acceptable band or arrival exceeds the deadline.
+  // This finds the LATEST 1-min slot that's still within the no-rush band.
   let best = seed;
-  // Run a few golden-section iterations within remaining budget
-  while (calls < req.budget && minutesBetween(lo, hi) > 1) {
-    const m1 = addMinutes(hi, -minutesBetween(lo, hi) / PHI);
-    const m2 = addMinutes(lo, minutesBetween(lo, hi) / PHI);
-    const c1 = await sample(roundToMinute(m1));
-    const c2 = await sample(roundToMinute(m2));
-    if (!c1 || !c2) break;
-    if (c1.arrive <= req.arriveBy && isBetter(c1, best)) best = c1;
-    if (c2.arrive <= req.arriveBy && isBetter(c2, best)) best = c2;
-    if (c1.durationSec < c2.durationSec) hi = m2;
-    else lo = m1;
+  const refineCap = Math.min(addMinutes(seed.depart, REFINE_RADIUS_MIN).getTime(), windowEnd.getTime());
+  for (let mins = 1; calls < req.budget; mins++) {
+    const t = new Date(seed.depart.getTime() + mins * 60_000);
+    if (t.getTime() > refineCap) break;
+    const c = await sample(t);
+    if (!c) break;
+    if (c.arrive > req.arriveBy) break;
+    if (c.durationSec > threshold) break;
+    best = c;
   }
 
   // Return alternatives sorted by departure time so the UI can render a
@@ -154,12 +159,4 @@ export async function findOptimalDeparture(req: OptimizeRequest): Promise<Optimi
 
 function addMinutes(d: Date, m: number): Date {
   return new Date(d.getTime() + m * 60_000);
-}
-
-function minutesBetween(a: Date, b: Date): number {
-  return (b.getTime() - a.getTime()) / 60_000;
-}
-
-function roundToMinute(d: Date): Date {
-  return new Date(Math.round(d.getTime() / 60_000) * 60_000);
 }
