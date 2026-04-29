@@ -1,0 +1,21 @@
+{
+  "appName": "طريقك",
+  "home": {
+    "tagline": "متى يجب أن تغادر؟",
+    "originLabel": "من",
+    "destLabel": "إلى",
+    "arriveByLabel": "الوصول قبل",
+    "submit": "إيجاد أفضل وقت",
+    "originPlaceholder": "خط العرض، خط الطول",
+    "destPlaceholder": "خط العرض، خط الطول"
+  },
+  "result": {
+    "leaveAt": "غادر الساعة",
+    "arrives": "الوصول",
+    "minutesEarly": "قبل موعدك بـ {{n}} دقيقة",
+    "minutesLate": "متأخر {{n}} دقيقة",
+    "based": "بناءً على بيانات حركة المرور المباشرة",
+    "loading": "جاري الحساب…",
+    "error": "تعذر الحساب. حاول مرة أخرى."
+  }
+}

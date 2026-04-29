@@ -1,0 +1,30 @@
+{
+  "expo": {
+    "name": "Taregak",
+    "slug": "taregak",
+    "version": "0.0.1",
+    "orientation": "portrait",
+    "scheme": "taregak",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.taregak.app"
+    },
+    "android": {
+      "package": "com.taregak.app",
+      "adaptiveIcon": {
+        "backgroundColor": "#0F1115"
+      }
+    },
+    "web": {
+      "bundler": "metro"
+    },
+    "plugins": [
+      "expo-router"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}

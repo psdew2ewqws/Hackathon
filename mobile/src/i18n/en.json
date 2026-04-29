@@ -1,0 +1,21 @@
+{
+  "appName": "Taregak",
+  "home": {
+    "tagline": "When should you leave?",
+    "originLabel": "From",
+    "destLabel": "To",
+    "arriveByLabel": "Arrive by",
+    "submit": "Find best time",
+    "originPlaceholder": "lat, lng (e.g. 31.951, 35.923)",
+    "destPlaceholder": "lat, lng"
+  },
+  "result": {
+    "leaveAt": "Leave at",
+    "arrives": "Arrives",
+    "minutesEarly": "{{n}} min before your deadline",
+    "minutesLate": "{{n}} min late",
+    "based": "Based on live traffic",
+    "loading": "Calculating optimal departure…",
+    "error": "Could not compute. Please try again."
+  }
+}

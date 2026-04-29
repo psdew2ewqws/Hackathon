@@ -1,0 +1,22 @@
+{
+  "name": "taregak",
+  "version": "0.0.1",
+  "private": true,
+  "description": "When-to-leave + BRT arrival app for Amman, Jordan",
+  "workspaces": [
+    "server",
+    "mobile",
+    "scripts"
+  ],
+  "scripts": {
+    "dev:server": "npm -w server run dev",
+    "dev:mobile": "npm -w mobile run start",
+    "build:server": "npm -w server run build",
+    "lint": "npm -ws --if-present run lint",
+    "typecheck": "npm -ws --if-present run typecheck",
+    "validate:week1": "npm -w scripts run validate:week1"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
