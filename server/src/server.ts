@@ -6,6 +6,7 @@ import { serializerCompiler, validatorCompiler, ZodTypeProvider } from "fastify-
 import { config } from "./config.js";
 import { healthRoutes } from "./api/health.js";
 import { predictDepartureRoutes } from "./api/predict-departure.js";
+import { placesRoutes } from "./api/places.js";
 
 export async function buildServer() {
   const app = Fastify({
@@ -29,6 +30,7 @@ export async function buildServer() {
 
   await app.register(healthRoutes, { prefix: "/v1" });
   await app.register(predictDepartureRoutes, { prefix: "/v1" });
+  await app.register(placesRoutes, { prefix: "/v1" });
 
   return app;
 }
