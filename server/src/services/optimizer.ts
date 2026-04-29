@@ -36,11 +36,25 @@ export interface OptimizeResult {
 
 const COARSE_STEP_MIN = 15;
 const REFINE_RADIUS_MIN = 7;
+const NOW_BUFFER_MIN = 2; // Routes API rejects departure_time in the past
 const PHI = (1 + Math.sqrt(5)) / 2;
 
 export async function findOptimalDeparture(req: OptimizeRequest): Promise<OptimizeResult> {
+  const earliestAllowed = new Date(Date.now() + NOW_BUFFER_MIN * 60_000);
   const windowEnd = addMinutes(req.arriveBy, -5);
-  const windowStart = addMinutes(req.arriveBy, -req.windowMinutes);
+  const rawWindowStart = addMinutes(req.arriveBy, -req.windowMinutes);
+  const windowStart = rawWindowStart < earliestAllowed ? earliestAllowed : rawWindowStart;
+
+  // If arriveBy is in the past (or less than 5 min away), it's not feasible
+  if (windowEnd <= windowStart) {
+    return {
+      status: "IMPOSSIBLE",
+      earliestArrival: earliestAllowed,
+      alternatives: [],
+      apiCallsUsed: 0,
+      source: "live",
+    };
+  }
 
   let calls = 0;
   const sample = async (t: Date): Promise<DepartureCandidate | null> => {

@@ -81,7 +81,7 @@ interface WebMapProps {
 // Lazily required so RN bundler on native doesn't try to resolve `@vis.gl/...`
 function WebMap(props: WebMapProps) {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const { APIProvider, Map, AdvancedMarker, Pin, useMap } = require("@vis.gl/react-google-maps") as typeof import("@vis.gl/react-google-maps");
+  const { APIProvider, Map, Marker, useMap } = require("@vis.gl/react-google-maps") as typeof import("@vis.gl/react-google-maps");
 
   const [activePin, setActivePin] = useState<ActivePin>(props.origin ? "dest" : "origin");
 
@@ -120,7 +120,6 @@ function WebMap(props: WebMapProps) {
       <APIProvider apiKey={props.apiKey}>
         <View style={styles.mapBox}>
           <Map
-            mapId="taregak-amman"
             defaultCenter={props.center}
             defaultZoom={props.zoom}
             disableDefaultUI={false}
@@ -129,19 +128,29 @@ function WebMap(props: WebMapProps) {
             style={{ width: "100%", height: "100%" }}
           >
             {props.origin && (
-              <DraggableMarker
+              <Marker
                 position={props.origin.location}
-                color="#3B82F6"
-                label="A"
-                onDragEnd={(loc) => props.onOriginChange(customPlace("Origin", loc))}
+                draggable
+                icon="https://maps.google.com/mapfiles/ms/icons/blue-dot.png"
+                onDragEnd={(e: { latLng?: { lat: () => number; lng: () => number } | null }) => {
+                  if (!e.latLng) return;
+                  props.onOriginChange(
+                    customPlace("Origin", { lat: e.latLng.lat(), lng: e.latLng.lng() }),
+                  );
+                }}
               />
             )}
             {props.dest && (
-              <DraggableMarker
+              <Marker
                 position={props.dest.location}
-                color="#EF4444"
-                label="B"
-                onDragEnd={(loc) => props.onDestChange(customPlace("Destination", loc))}
+                draggable
+                icon="https://maps.google.com/mapfiles/ms/icons/red-dot.png"
+                onDragEnd={(e: { latLng?: { lat: () => number; lng: () => number } | null }) => {
+                  if (!e.latLng) return;
+                  props.onDestChange(
+                    customPlace("Destination", { lat: e.latLng.lat(), lng: e.latLng.lng() }),
+                  );
+                }}
               />
             )}
             <AutoFit origin={props.origin?.location ?? null} dest={props.dest?.location ?? null} />
@@ -177,36 +186,21 @@ function WebMap(props: WebMapProps) {
     </View>
   );
 
-  // Helper components below — defined inside WebMap so they share the lazy require
-  function DraggableMarker(p: {
-    position: LatLng;
-    color: string;
-    label: string;
-    onDragEnd: (loc: LatLng) => void;
-  }) {
-    return (
-      <AdvancedMarker
-        position={p.position}
-        draggable
-        onDragEnd={(e: { latLng?: { lat: () => number; lng: () => number } | null }) => {
-          if (!e.latLng) return;
-          p.onDragEnd({ lat: e.latLng.lat(), lng: e.latLng.lng() });
-        }}
-      >
-        <Pin background={p.color} borderColor="#0F1115" glyphColor="#fff" glyph={p.label} />
-      </AdvancedMarker>
-    );
-  }
-
   function AutoFit({ origin, dest }: { origin: LatLng | null; dest: LatLng | null }) {
     const map = useMap();
     useEffect(() => {
       if (!map) return;
       if (origin && dest) {
-        const bounds = new google.maps.LatLngBounds();
-        bounds.extend(origin);
-        bounds.extend(dest);
-        map.fitBounds(bounds, 64);
+        const padDeg = 0.005;
+        map.fitBounds(
+          {
+            north: Math.max(origin.lat, dest.lat) + padDeg,
+            south: Math.min(origin.lat, dest.lat) - padDeg,
+            east: Math.max(origin.lng, dest.lng) + padDeg,
+            west: Math.min(origin.lng, dest.lng) - padDeg,
+          },
+          64,
+        );
       } else if (origin) {
         map.panTo(origin);
         map.setZoom(14);

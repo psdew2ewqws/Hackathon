@@ -13,11 +13,20 @@ import {
 } from "../src/services/api";
 import { getDeviceId } from "../src/store/deviceId";
 
-const DEFAULT_ARRIVE_BY_OFFSET_MIN = 90;
+const DEFAULT_ARRIVE_BY_OFFSET_MIN = 120;
 
+/**
+ * Returns "YYYY-MM-DDTHH:MM" in the user's *local* timezone, because that's
+ * how an HTML <input type="datetime-local"> (and a plain text input parsed
+ * via `new Date(...)`) interpret a string with no timezone suffix.
+ */
 function defaultArriveBy(): string {
   const d = new Date(Date.now() + DEFAULT_ARRIVE_BY_OFFSET_MIN * 60_000);
-  return d.toISOString().slice(0, 16);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return (
+    `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}` +
+    `T${pad(d.getHours())}:${pad(d.getMinutes())}`
+  );
 }
 
 export default function Home() {
