@@ -39,6 +39,20 @@ const REFINE_RADIUS_MIN = 7;
 const NOW_BUFFER_MIN = 2; // Routes API rejects departure_time in the past
 const PHI = (1 + Math.sqrt(5)) / 2;
 
+/**
+ * Comparator for two feasible candidates. We prefer:
+ *   1. shorter duration when the difference is meaningful (>= 60s),
+ *   2. otherwise the LATER departure (less wait at destination).
+ * This matches the user's actual goal: "skip the traffic, but don't make me
+ * leave hours early when traffic is the same anyway."
+ */
+const TIE_THRESHOLD_SEC = 60;
+function isBetter(a: DepartureCandidate, b: DepartureCandidate): boolean {
+  if (a.durationSec < b.durationSec - TIE_THRESHOLD_SEC) return true;
+  if (a.durationSec > b.durationSec + TIE_THRESHOLD_SEC) return false;
+  return a.depart > b.depart;
+}
+
 export async function findOptimalDeparture(req: OptimizeRequest): Promise<OptimizeResult> {
   const earliestAllowed = new Date(Date.now() + NOW_BUFFER_MIN * 60_000);
   const windowEnd = addMinutes(req.arriveBy, -5);
@@ -97,8 +111,9 @@ export async function findOptimalDeparture(req: OptimizeRequest): Promise<Optimi
     };
   }
 
-  // Pick the latest feasible coarse departure as the seed for refinement
-  const seed = feasible.reduce((best, c) => (c.depart > best.depart ? c : best));
+  // Pick the best feasible coarse slot as the refinement seed
+  // (shortest duration, with later-departure as tiebreaker).
+  const seed = feasible.reduce((best, c) => (isBetter(c, best) ? c : best));
 
   // Golden-section refinement around the seed at 1-min granularity
   let lo = addMinutes(seed.depart, -REFINE_RADIUS_MIN);
@@ -114,15 +129,17 @@ export async function findOptimalDeparture(req: OptimizeRequest): Promise<Optimi
     const c1 = await sample(roundToMinute(m1));
     const c2 = await sample(roundToMinute(m2));
     if (!c1 || !c2) break;
-    if (c1.arrive <= req.arriveBy && c1.depart >= best.depart) best = c1;
-    if (c2.arrive <= req.arriveBy && c2.depart >= best.depart) best = c2;
+    if (c1.arrive <= req.arriveBy && isBetter(c1, best)) best = c1;
+    if (c2.arrive <= req.arriveBy && isBetter(c2, best)) best = c2;
     if (c1.durationSec < c2.durationSec) hi = m2;
     else lo = m1;
   }
 
+  // Return alternatives sorted by departure time so the UI can render a
+  // departure-vs-duration curve.
   const alternatives = [...coarse]
     .sort((a, b) => a.depart.getTime() - b.depart.getTime())
-    .slice(0, 5);
+    .slice(0, 8);
 
   return {
     status: "OK",
