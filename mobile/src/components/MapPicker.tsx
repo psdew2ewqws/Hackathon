@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { useQuery } from "@tanstack/react-query";
 
-import { fetchConfig, type LatLng, type PlaceDetails } from "../services/api";
+import { fetchConfig, reverseGeocode, type LatLng, type PlaceDetails } from "../services/api";
 
 interface Props {
   origin: PlaceDetails | null;
@@ -85,19 +85,40 @@ function WebMap(props: WebMapProps) {
 
   const [activePin, setActivePin] = useState<ActivePin>(props.origin ? "dest" : "origin");
 
+  // Drop a pin instantly, then upgrade its label once reverse-geocoding resolves.
+  // The setter callback re-checks identity so a second click before resolution
+  // doesn't overwrite the new placeholder with the old name.
+  const setPlace = useCallback(
+    (pin: ActivePin, place: PlaceDetails) => {
+      if (pin === "origin") props.onOriginChange(place);
+      else props.onDestChange(place);
+    },
+    [props],
+  );
+
+  const resolveLabel = useCallback(
+    async (pin: ActivePin, point: LatLng, fallback: string) => {
+      const placeholder = customPlace(fallback, point);
+      setPlace(pin, placeholder);
+      try {
+        const resolved = await reverseGeocode(point);
+        setPlace(pin, resolved);
+      } catch {
+        // keep placeholder coordinates if reverse-geocode fails
+      }
+    },
+    [setPlace],
+  );
+
   const handleClick = useCallback(
     (e: { detail: { latLng: { lat: number; lng: number } | null } }) => {
       if (!e.detail.latLng) return;
       const point: LatLng = { lat: e.detail.latLng.lat, lng: e.detail.latLng.lng };
-      const place = customPlace(activePin === "origin" ? "Origin" : "Destination", point);
-      if (activePin === "origin") {
-        props.onOriginChange(place);
-        setActivePin("dest");
-      } else {
-        props.onDestChange(place);
-      }
+      const fallback = activePin === "origin" ? "Origin" : "Destination";
+      void resolveLabel(activePin, point, fallback);
+      if (activePin === "origin") setActivePin("dest");
     },
-    [activePin, props],
+    [activePin, resolveLabel],
   );
 
   const handleUseLocation = useCallback(() => {
@@ -105,7 +126,7 @@ function WebMap(props: WebMapProps) {
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         const point: LatLng = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-        props.onOriginChange(customPlace("Your location", point));
+        void resolveLabel("origin", point, "Your location");
         setActivePin("dest");
       },
       (err) => {
@@ -113,7 +134,7 @@ function WebMap(props: WebMapProps) {
       },
       { enableHighAccuracy: true, timeout: 10_000 },
     );
-  }, [props]);
+  }, [resolveLabel]);
 
   return (
     <View style={styles.wrap}>
@@ -134,9 +155,7 @@ function WebMap(props: WebMapProps) {
                 icon="https://maps.google.com/mapfiles/ms/icons/blue-dot.png"
                 onDragEnd={(e: { latLng?: { lat: () => number; lng: () => number } | null }) => {
                   if (!e.latLng) return;
-                  props.onOriginChange(
-                    customPlace("Origin", { lat: e.latLng.lat(), lng: e.latLng.lng() }),
-                  );
+                  void resolveLabel("origin", { lat: e.latLng.lat(), lng: e.latLng.lng() }, "Origin");
                 }}
               />
             )}
@@ -147,9 +166,7 @@ function WebMap(props: WebMapProps) {
                 icon="https://maps.google.com/mapfiles/ms/icons/red-dot.png"
                 onDragEnd={(e: { latLng?: { lat: () => number; lng: () => number } | null }) => {
                   if (!e.latLng) return;
-                  props.onDestChange(
-                    customPlace("Destination", { lat: e.latLng.lat(), lng: e.latLng.lng() }),
-                  );
+                  void resolveLabel("dest", { lat: e.latLng.lat(), lng: e.latLng.lng() }, "Destination");
                 }}
               />
             )}
@@ -183,6 +200,13 @@ function WebMap(props: WebMapProps) {
           ? "Click anywhere on the map to drop your starting point"
           : "Now click the map to drop your destination"}
       </Text>
+
+      {(props.origin || props.dest) && (
+        <View style={styles.pinSummary}>
+          {props.origin && <PinBadge color="#3B82F6" label="From" name={props.origin.name} />}
+          {props.dest && <PinBadge color="#EF4444" label="To" name={props.dest.name} />}
+        </View>
+      )}
     </View>
   );
 
@@ -213,8 +237,32 @@ function WebMap(props: WebMapProps) {
   }
 }
 
+function PinBadge({ color, label, name }: { color: string; label: string; name: string }) {
+  return (
+    <View style={styles.pinBadge}>
+      <View style={[styles.dot, { backgroundColor: color }]} />
+      <Text style={styles.pinLabel}>{label}</Text>
+      <Text style={styles.pinName} numberOfLines={1}>
+        {name}
+      </Text>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   wrap: { marginTop: 12, marginBottom: 4 },
+  pinSummary: { marginTop: 8, gap: 6 },
+  pinBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#1A1F29",
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    gap: 8,
+  },
+  pinLabel: { color: "#8B95A8", fontSize: 12, fontWeight: "600", width: 28 },
+  pinName: { color: "#fff", fontSize: 13, flex: 1 },
   mapBox: {
     width: "100%",
     height: 360,

@@ -1,11 +1,30 @@
 {
   "appName": "طريقك",
+  "common": {
+    "cancel": "إلغاء"
+  },
+  "tabs": {
+    "plan": "خطّط",
+    "history": "السجل",
+    "profile": "الملف"
+  },
+  "auth": {
+    "tagline": "متى يجب أن تغادر؟",
+    "nameLabel": "اسمك",
+    "namePlaceholder": "مثال: عمر",
+    "phoneLabel": "رقم الهاتف",
+    "continue": "متابعة",
+    "disclaimer": "نحفظ رقمك على هذا الجهاز فقط. لن نرسل أي رسائل.",
+    "sanadButton": "تسجيل الدخول بسند",
+    "or": "أو"
+  },
   "home": {
     "tagline": "متى يجب أن تغادر؟",
     "originLabel": "من",
     "destLabel": "إلى",
     "arriveByLabel": "الوصول قبل",
     "submit": "إيجاد أفضل وقت",
+    "searchPlaceholder": "أو اكتب اسم مكان في عمّان…",
     "originPlaceholder": "خط العرض، خط الطول",
     "destPlaceholder": "خط العرض، خط الطول"
   },
@@ -16,6 +35,29 @@
     "minutesLate": "متأخر {{n}} دقيقة",
     "based": "بناءً على بيانات حركة المرور المباشرة",
     "loading": "جاري الحساب…",
-    "error": "تعذر الحساب. حاول مرة أخرى."
+    "error": "تعذر الحساب. حاول مرة أخرى.",
+    "earliestArrival": "أبكر وصول ممكن"
+  },
+  "history": {
+    "title": "رحلاتك",
+    "empty": "لا توجد رحلات بعد",
+    "emptyBody": "ستظهر الخطط التي تنشئها هنا.",
+    "count": "{{n}} محفوظة",
+    "clearAll": "حذف الكل",
+    "clearConfirmTitle": "حذف السجل؟",
+    "clearConfirmBody": "سيتم حذف جميع الرحلات المحفوظة على هذا الجهاز.",
+    "arriveBy": "الوصول قبل",
+    "leftAt": "المغادرة",
+    "arrived": "الوصول",
+    "impossible": "غير ممكن"
+  },
+  "profile": {
+    "title": "الملف الشخصي",
+    "preferences": "التفضيلات",
+    "account": "الحساب",
+    "language": "اللغة",
+    "logout": "تسجيل الخروج",
+    "logoutConfirmTitle": "تسجيل الخروج؟",
+    "logoutConfirmBody": "سيتم مسح سجل الرحلات على هذا الجهاز."
   }
 }

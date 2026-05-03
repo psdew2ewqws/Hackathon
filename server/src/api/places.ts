@@ -139,6 +139,80 @@ export const placesRoutes: FastifyPluginAsyncZod = async (app) => {
     },
   );
 
+  // Reverse geocoding: lat/lng → human-readable place name. Used when the user
+  // drops a pin on the map so we display "Sweifieh" instead of "Origin".
+  app.get(
+    "/places/reverse",
+    {
+      schema: {
+        querystring: z.object({
+          lat: z.coerce.number().min(-90).max(90),
+          lng: z.coerce.number().min(-180).max(180),
+          language: z.string().min(2).max(5).default("en"),
+        }),
+        response: { 200: DetailsResponse },
+      },
+    },
+    async (req) => {
+      const url = new URL("https://maps.googleapis.com/maps/api/geocode/json");
+      url.searchParams.set("latlng", `${req.query.lat},${req.query.lng}`);
+      url.searchParams.set("key", config.GOOGLE_MAPS_API_KEY);
+      url.searchParams.set("language", req.query.language);
+
+      const r = await fetch(url);
+      if (!r.ok) {
+        const text = await r.text();
+        const e = new Error(`reverse geocode ${r.status}: ${text}`);
+        (e as Error & { statusCode?: number }).statusCode = 502;
+        throw e;
+      }
+
+      const json = (await r.json()) as {
+        status: string;
+        results?: Array<{
+          place_id: string;
+          formatted_address: string;
+          address_components?: Array<{
+            long_name: string;
+            short_name: string;
+            types: string[];
+          }>;
+        }>;
+      };
+
+      // Fall back to a pretty coordinate if geocoding returned nothing
+      // (e.g. middle of the desert) so the UI never shows a blank label.
+      const coordName = `${req.query.lat.toFixed(4)}, ${req.query.lng.toFixed(4)}`;
+      const best = json.status === "OK" ? json.results?.[0] : undefined;
+      if (!best) {
+        return {
+          placeId: `latlng:${req.query.lat.toFixed(5)},${req.query.lng.toFixed(5)}`,
+          name: coordName,
+          location: { lat: req.query.lat, lng: req.query.lng },
+        };
+      }
+
+      const components = best.address_components ?? [];
+      const findType = (t: string) => components.find((c) => c.types.includes(t))?.long_name;
+      // Prefer the most local recognizable label. "sublocality" maps to
+      // neighborhoods like Sweifieh / Abdoun in Amman.
+      const name =
+        findType("sublocality") ??
+        findType("neighborhood") ??
+        findType("locality") ??
+        findType("administrative_area_level_2") ??
+        best.formatted_address.split(",")[0] ??
+        coordName;
+
+      return {
+        placeId: best.place_id,
+        name,
+        formattedAddress: best.formatted_address,
+        location: { lat: req.query.lat, lng: req.query.lng },
+      };
+    },
+  );
+
   // Static map: proxies Google Maps Static API so the API key stays server-side.
   // We just stream the PNG bytes back.
   app.get(

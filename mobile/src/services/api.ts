@@ -38,6 +38,16 @@ export async function placeDetails(placeId: string, sessionToken: string): Promi
   return (await res.json()) as PlaceDetails;
 }
 
+export async function reverseGeocode(point: LatLng, language = "en"): Promise<PlaceDetails> {
+  const url = new URL(`${BASE}/v1/places/reverse`);
+  url.searchParams.set("lat", String(point.lat));
+  url.searchParams.set("lng", String(point.lng));
+  url.searchParams.set("language", language);
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`reverse ${res.status}`);
+  return (await res.json()) as PlaceDetails;
+}
+
 export interface AppConfig {
   googleMapsBrowserKey: string;
   ammanCenter: LatLng;

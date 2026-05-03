@@ -1,11 +1,30 @@
 {
   "appName": "Taregak",
+  "common": {
+    "cancel": "Cancel"
+  },
+  "tabs": {
+    "plan": "Plan",
+    "history": "History",
+    "profile": "Profile"
+  },
+  "auth": {
+    "tagline": "When should you leave?",
+    "nameLabel": "Your name",
+    "namePlaceholder": "e.g. Omar",
+    "phoneLabel": "Phone number",
+    "continue": "Continue",
+    "disclaimer": "We use your number only on this device. No SMS sent.",
+    "sanadButton": "Login with Sanad",
+    "or": "OR"
+  },
   "home": {
     "tagline": "When should you leave?",
     "originLabel": "From",
     "destLabel": "To",
     "arriveByLabel": "Arrive by",
     "submit": "Find best time",
+    "searchPlaceholder": "Or type a place in Amman…",
     "originPlaceholder": "lat, lng (e.g. 31.951, 35.923)",
     "destPlaceholder": "lat, lng"
   },
@@ -16,6 +35,29 @@
     "minutesLate": "{{n}} min late",
     "based": "Based on live traffic",
     "loading": "Calculating optimal departure…",
-    "error": "Could not compute. Please try again."
+    "error": "Could not compute. Please try again.",
+    "earliestArrival": "Earliest possible arrival"
+  },
+  "history": {
+    "title": "Your trips",
+    "empty": "No trips yet",
+    "emptyBody": "Plans you make will show up here.",
+    "count": "{{n}} saved",
+    "clearAll": "Clear all",
+    "clearConfirmTitle": "Clear history?",
+    "clearConfirmBody": "This removes all saved trips on this device.",
+    "arriveBy": "Arrive by",
+    "leftAt": "Leave",
+    "arrived": "Arrive",
+    "impossible": "Not feasible"
+  },
+  "profile": {
+    "title": "Profile",
+    "preferences": "Preferences",
+    "account": "Account",
+    "language": "Language",
+    "logout": "Log out",
+    "logoutConfirmTitle": "Log out?",
+    "logoutConfirmBody": "Your trip history on this device will be cleared."
   }
 }

@@ -1,19 +1,20 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useMutation } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import { Stack } from "expo-router";
 
-import { PlaceSearchInput } from "../src/components/PlaceSearchInput";
-import { MapPicker } from "../src/components/MapPicker";
-import { ArriveByPicker } from "../src/components/ArriveByPicker";
+import { PlaceSearchInput } from "../../src/components/PlaceSearchInput";
+import { MapPicker } from "../../src/components/MapPicker";
+import { ArriveByPicker } from "../../src/components/ArriveByPicker";
 import {
   predictDeparture,
   type PlaceDetails,
   type PredictDepartureResponse,
-} from "../src/services/api";
-import { getDeviceId } from "../src/store/deviceId";
-import { roundUpTo5Min, toLocalDateTimeString } from "../src/lib/time";
+} from "../../src/services/api";
+import { getDeviceId } from "../../src/store/deviceId";
+import { useHistory } from "../../src/store/history";
+import { useLastRoute } from "../../src/store/lastRoute";
+import { roundUpTo5Min, toLocalDateTimeString } from "../../src/lib/time";
 
 const DEFAULT_ARRIVE_BY_OFFSET_MIN = 120;
 
@@ -21,11 +22,30 @@ function defaultArriveBy(): string {
   return toLocalDateTimeString(roundUpTo5Min(new Date(Date.now() + DEFAULT_ARRIVE_BY_OFFSET_MIN * 60_000)));
 }
 
-export default function Home() {
+function makeTripId(): string {
+  return globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`;
+}
+
+export default function PlanTab() {
   const { t } = useTranslation();
+  const lastOrigin = useLastRoute((s) => s.origin);
+  const lastDest = useLastRoute((s) => s.dest);
+  const lastRouteHydrated = useLastRoute((s) => s.hydrated);
+  const saveLastRoute = useLastRoute((s) => s.save);
+  const pushHistory = useHistory((s) => s.push);
+
   const [origin, setOrigin] = useState<PlaceDetails | null>(null);
   const [dest, setDest] = useState<PlaceDetails | null>(null);
   const [arriveBy, setArriveBy] = useState(defaultArriveBy());
+  const [restored, setRestored] = useState(false);
+
+  // Restore last origin/dest on first render after hydration.
+  useEffect(() => {
+    if (!lastRouteHydrated || restored) return;
+    if (lastOrigin) setOrigin(lastOrigin);
+    if (lastDest) setDest(lastDest);
+    setRestored(true);
+  }, [lastRouteHydrated, restored, lastOrigin, lastDest]);
 
   const canSubmit = Boolean(origin && dest && arriveBy);
 
@@ -41,24 +61,38 @@ export default function Home() {
         getDeviceId(),
       );
     },
+    onSuccess: (data) => {
+      if (!origin || !dest) return;
+      void saveLastRoute({ origin, dest });
+      void pushHistory({
+        id: makeTripId(),
+        origin: { name: origin.name, lat: origin.location.lat, lng: origin.location.lng },
+        dest: { name: dest.name, lat: dest.location.lat, lng: dest.location.lng },
+        arriveBy: new Date(arriveBy).toISOString(),
+        status: data.status,
+        recommendedDeparture: data.recommendedDeparture,
+        expectedArrival: data.expectedArrival,
+        expectedDurationSec: data.expectedDurationSec,
+        savedAt: new Date().toISOString(),
+      });
+    },
   });
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <Stack.Screen options={{ title: t("appName") }} />
       <Text style={styles.tagline}>{t("home.tagline")}</Text>
 
       <MapPicker origin={origin} dest={dest} onOriginChange={setOrigin} onDestChange={setDest} />
 
       <PlaceSearchInput
         label={t("home.originLabel")}
-        placeholder="Or type a place in Amman…"
+        placeholder={t("home.searchPlaceholder")}
         value={origin}
         onChange={setOrigin}
       />
       <PlaceSearchInput
         label={t("home.destLabel")}
-        placeholder="Or type a place in Amman…"
+        placeholder={t("home.searchPlaceholder")}
         value={dest}
         onChange={setDest}
       />
@@ -88,7 +122,7 @@ function Result({ data, arriveBy }: { data: PredictDepartureResponse; arriveBy: 
       <View style={styles.resultCard}>
         <Text style={styles.resultHero}>—</Text>
         <Text style={styles.resultSub}>
-          Earliest possible arrival: {earliest ? formatTime(earliest) : "n/a"}
+          {t("result.earliestArrival")}: {earliest ? formatTime(earliest) : "n/a"}
         </Text>
       </View>
     );
