@@ -1,0 +1,12 @@
+{
+  "_about": "Drop these contents into Claude Desktop's claude_desktop_config.json (under ~/.config/Claude/ on Linux, ~/Library/Application Support/Claude/ on macOS) to expose the traffic-intel intersection tools to Claude Desktop. After saving, fully restart Claude Desktop and you should see the 7 tools (get_current_state, get_forecast, get_history, get_recommendation, list_incidents, get_signal_plan, query_sqlite) in any conversation. Cursor and other MCP clients accept the same shape under their own config files. The server reads the local SQLite at phase3-fullstack/data/traffic_intel.db read-only — no network, no API key required.",
+  "mcpServers": {
+    "traffic-intel": {
+      "command": "/absolute/path/to/traffic-intel/.venv/bin/python",
+      "args": ["-m", "traffic_intel_mcp"],
+      "env": {
+        "MCP_LOG_LEVEL": "WARNING"
+      }
+    }
+  }
+}

@@ -22,6 +22,8 @@ import {
   type SiteConfig,
 } from '../api/types';
 import { ApproachCard } from '../components/ApproachCard';
+import { DetectorBackendToggle } from '../components/DetectorBackendToggle';
+import { LaneOverlay } from '../components/LaneOverlay';
 import { Pill } from '../components/Pill';
 import { LineChart } from '../components/charts';
 
@@ -337,19 +339,22 @@ export function LivePage() {
       >
         <section style={cardStyle}>
           <h2 style={cardTitle}>Annotated RTSP feed</h2>
-          <img
-            src={apiUrl('/mjpeg')}
-            alt="live"
-            style={{
-              width: '100%',
-              maxWidth: 960,
-              aspectRatio: '16 / 9',
-              display: 'block',
-              background: '#000',
-              borderRadius: 8,
-              objectFit: 'cover',
-            }}
-          />
+          <DetectorBackendToggle />
+          <div style={{ position: 'relative', width: '100%', maxWidth: 960 }}>
+            <img
+              src={apiUrl('/mjpeg')}
+              alt="live"
+              style={{
+                width: '100%',
+                aspectRatio: '16 / 9',
+                display: 'block',
+                background: '#000',
+                borderRadius: 8,
+                objectFit: 'cover',
+              }}
+            />
+            <LaneOverlay />
+          </div>
         </section>
 
         <section

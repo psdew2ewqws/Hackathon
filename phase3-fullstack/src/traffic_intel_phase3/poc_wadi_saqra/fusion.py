@@ -192,38 +192,52 @@ def classify_pressure(pressure: float) -> str:
 
 
 def fuse(
-    approach_counts: dict[str, dict[str, int]],
+    approach_counts: dict[str, dict],
     bin_seconds: int,
     gmaps_rows: dict[str, GmapsRow],
 ) -> dict[str, dict]:
-    """
-    Input:
-      approach_counts: { "N": {"in_zone": x, "crossings_in_bin": y, ...}, ... }
-      bin_seconds:     duration of the most recent bin
-      gmaps_rows:      per-corridor GmapsRow from load_gmaps
+    """Fuse per-approach counts with gmaps congestion into a single state.
+
+    Input per approach (PCE keys are optional; missing PCE falls back to
+    raw counts so legacy call sites still work):
+      {"in_zone": int, "crossings_in_bin": int,
+       "in_zone_pce": float?, "crossings_pce_in_bin": float?, "mix": dict?}
 
     Output per approach:
-      {
-        "in_zone", "crossings_in_bin",
-        "demand_per_min", "queue",
-        "gmaps_congestion_ratio", "gmaps_label",
-        "pressure", "label"
-      }
+      {"in_zone", "crossings_in_bin", "in_zone_pce", "mix",
+       "demand_per_min", "pce_demand_per_min", "queue",
+       "gmaps_congestion_ratio", "gmaps_label", "gmaps_speed_kmh",
+       "pressure", "label"}
+
+    Pressure is now computed in PCE-units (a bus contributes 2.0 of
+    pressure where it would have contributed 1.0 in the legacy formula).
+    The classify_pressure thresholds keep their numeric values; their
+    semantics shift from "vehicles" to "PCE-vehicles."
     """
     out: dict[str, dict] = {}
     for approach, c in approach_counts.items():
         in_zone = int(c.get("in_zone", 0))
         crossings = int(c.get("crossings_in_bin", 0))
+        in_zone_pce = float(c.get("in_zone_pce", in_zone))
+        pce_in_bin = float(c.get("crossings_pce_in_bin", crossings))
+        mix = dict(c.get("mix") or {})
+
         demand_per_min = (crossings * 60.0 / max(bin_seconds, 1))
+        pce_demand_per_min = (pce_in_bin * 60.0 / max(bin_seconds, 1))
+
         g = gmaps_rows.get(approach)
         ratio = g.congestion_ratio if g else 1.0
         penalty = max(0.0, ratio - 1.0) * 2.0
-        # pressure = demand (veh/min) + 0.5 * queue * (1 + gmaps penalty)
-        pressure = demand_per_min + 0.5 * in_zone * (1.0 + penalty)
+        # PCE-units: pressure = pce_demand (PCE-veh/min) + 0.5 * pce_queue * (1 + gmaps penalty)
+        pressure = pce_demand_per_min + 0.5 * in_zone_pce * (1.0 + penalty)
+
         out[approach] = {
             "in_zone": in_zone,
             "crossings_in_bin": crossings,
+            "in_zone_pce": round(in_zone_pce, 2),
+            "mix": mix,
             "demand_per_min": round(demand_per_min, 2),
+            "pce_demand_per_min": round(pce_demand_per_min, 2),
             "queue": in_zone,
             "gmaps_congestion_ratio": round(ratio, 3) if g else None,
             "gmaps_label": g.congestion_label if g else None,
@@ -256,6 +270,7 @@ def _phase_flow_ratio_hcm(
     saturation_flow_per_min: float,
     lane_count: int,
     cycle_seconds: float,
+    lane_counts: dict[str, int] | None = None,
 ) -> float:
     """HCM-style flow ratio y = arrival_rate / (saturation_flow × lanes).
 
@@ -264,14 +279,17 @@ def _phase_flow_ratio_hcm(
     intersection doesn't collapse the cycle to 10s, and so Y rarely saturates.
 
     ``saturation_flow_per_min`` default ≈ 30 veh/min/lane (HCM 1800 veh/h/lane).
-    ``lane_count`` is per approach (not per phase).
+    ``lane_count`` is the per-approach default. ``lane_counts`` (Phase 1.5,
+    optional) overrides per-approach so a measured lane count from
+    `wadi_saqra_zones.json` takes precedence over the hardcoded default.
     """
-    capacity_per_approach = max(1.0, saturation_flow_per_min * max(lane_count, 1))
     ys: list[float] = []
     for a in approaches:
         row = fused.get(a, {})
         arrival = _approach_arrival_rate(row, cycle_seconds)
-        y = arrival / capacity_per_approach
+        n_lanes = (lane_counts or {}).get(a, lane_count)
+        capacity = max(1.0, saturation_flow_per_min * max(n_lanes, 1))
+        y = arrival / capacity
         ys.append(min(0.95, max(0.02, y)))
     return max(ys) if ys else 0.02
 
@@ -296,6 +314,7 @@ def webster_two_phase(
     min_green: float = 10.0,
     max_green: float = 90.0,
     lane_count: int = 2,
+    lane_counts: dict[str, int] | None = None,
 ) -> dict:
     """
     Webster for a 2-phase signal: NS (N+S open together) and EW (E+W together).
@@ -323,8 +342,8 @@ def webster_two_phase(
     else:
         seed_cycle = 80.0
 
-    y_NS = _phase_flow_ratio_hcm(fused, ["N", "S"], saturation, lane_count, seed_cycle)
-    y_EW = _phase_flow_ratio_hcm(fused, ["E", "W"], saturation, lane_count, seed_cycle)
+    y_NS = _phase_flow_ratio_hcm(fused, ["N", "S"], saturation, lane_count, seed_cycle, lane_counts)
+    y_EW = _phase_flow_ratio_hcm(fused, ["E", "W"], saturation, lane_count, seed_cycle, lane_counts)
     Y = y_NS + y_EW
 
     if Y >= 0.95:
@@ -456,6 +475,7 @@ def webster_three_phase(
     min_green: float = 10.0,
     max_green: float = 90.0,
     lane_count: int = 2,
+    lane_counts: dict[str, int] | None = None,
 ) -> dict:
     """
     Webster for a 3-phase signal: NS (N+S together), then E alone, then W alone.
@@ -478,9 +498,9 @@ def webster_three_phase(
     else:
         seed_cycle = 120.0
 
-    y_NS = _phase_flow_ratio_hcm(fused, ["N", "S"], saturation, lane_count, seed_cycle)
-    y_E = _phase_flow_ratio_hcm(fused, ["E"], saturation, lane_count, seed_cycle)
-    y_W = _phase_flow_ratio_hcm(fused, ["W"], saturation, lane_count, seed_cycle)
+    y_NS = _phase_flow_ratio_hcm(fused, ["N", "S"], saturation, lane_count, seed_cycle, lane_counts)
+    y_E = _phase_flow_ratio_hcm(fused, ["E"], saturation, lane_count, seed_cycle, lane_counts)
+    y_W = _phase_flow_ratio_hcm(fused, ["W"], saturation, lane_count, seed_cycle, lane_counts)
     Y = y_NS + y_E + y_W
 
     if Y >= 0.95:

@@ -30,7 +30,8 @@ from pathlib import Path
 import cv2
 import numpy as np
 import supervision as sv
-from ultralytics import YOLO
+
+from traffic_intel_detector import build_detector, build_tracker
 
 from .events import EventLog
 from .homography import CameraTracker
@@ -206,8 +207,27 @@ def run(
     # FP16 auto-enables on GPU (2–3× throughput, minimal accuracy cost); off on CPU.
     if half is None:
         half = device != "cpu"
-    print(f"[phase2] loading {model_name} on device={device} half={half}", file=sys.stderr)
-    model = YOLO(model_name)
+
+    # Detector backend selection now lives behind DETECTOR_BACKEND. The
+    # legacy --model and --tracker CLI flags still feed the ultralytics
+    # backend (when selected), but on the rfdetr path they're advisory only.
+    os.environ.setdefault("DETECTOR_DEVICE", device if device != "cpu" else "cpu")
+    os.environ.setdefault("DETECTOR_FP16", "1" if half else "0")
+    if os.environ.get("DETECTOR_BACKEND", "rfdetr").lower() == "ultralytics":
+        os.environ.setdefault("YOLO_WEIGHTS", model_name)
+    detector = build_detector()
+    bytetracker = build_tracker(frame_rate=10)
+    yolo_model_name_for_labels = "ultralytics" if detector.name == "ultralytics" else "rfdetr"
+    if tracker and tracker not in {"bytetrack.yaml", "bytetrack"}:
+        print(
+            f"[phase2] WARN --tracker={tracker!r} is ignored on the new pipeline; "
+            f"both backends now use supervision ByteTrack",
+            file=sys.stderr,
+        )
+    print(
+        f"[phase2] detector={detector.info()} (device={device} half={half})",
+        file=sys.stderr,
+    )
 
     # Build overlay annotators up front (supervision)
     box_annotator = sv.BoxAnnotator(thickness=2)
@@ -291,26 +311,17 @@ def run(
     zone_ref_polys      = [z.polygon.copy() if z.polygon is not None else None
                            for z in zones]
 
-    try:
-        stream = model.track(
-            source=source,
-            tracker=tracker,
-            classes=list(VEHICLE_CLASSES),
-            conf=conf,
-            iou=iou,
-            imgsz=imgsz,
-            device=device,
-            half=half,
-            persist=True,
-            stream=True,
-            verbose=False,
-        )
+    cap = cv2.VideoCapture(source, cv2.CAP_FFMPEG)
+    if not cap.isOpened():
+        raise RuntimeError(f"could not open source: {source}")
+    cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
 
-        for result in stream:
+    try:
+        while True:
+            ok, frame = cap.read()
+            if not ok or frame is None:
+                break
             t0 = time.monotonic()
-            frame = result.orig_img  # BGR numpy array
-            if frame is None:
-                continue
 
             # Camera motion: update homography when enabled. For static
             # cameras (e.g. TheVideo.mp4) we skip it — the reference-frame
@@ -380,7 +391,8 @@ def run(
                     except Exception:
                         pass
 
-            detections = sv.Detections.from_ultralytics(result)
+            detections = detector.detect(frame)
+            detections = bytetracker.update(detections, frame)
             n_det = len(detections)
             det_count_total += n_det
             if detections.tracker_id is not None:
@@ -467,7 +479,8 @@ def run(
                             tid = int(raw_tid)
                     cid = int(detections.class_id[i]) if detections.class_id is not None else -1
                     conf = float(detections.confidence[i]) if detections.confidence is not None else 0.0
-                    name = model.names.get(cid, str(cid))
+                    cls_names = detections.data.get("class_name") if detections.data else None
+                    name = str(cls_names[i]) if cls_names is not None and i < len(cls_names) else str(cid)
                     tag = f"#{tid} " if tid is not None else ""
                     labels.append(f"{tag}{name} {conf:.2f}")
 

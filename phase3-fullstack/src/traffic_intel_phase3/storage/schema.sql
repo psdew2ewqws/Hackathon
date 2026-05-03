@@ -166,6 +166,40 @@ CREATE TABLE IF NOT EXISTS llm_messages (
 );
 CREATE INDEX IF NOT EXISTS idx_llm_msg_conv ON llm_messages(conversation_id, ts);
 
+-- Phase 2: forecast scoring. Joins each persisted forecast against the
+-- detector_count bin whose ts ≈ target_ts, so we can render rolling MAE
+-- per approach × horizon on the dashboard. Populated by
+-- scripts/backfill_forecast_score.py (idempotent).
+CREATE TABLE IF NOT EXISTS forecast_score (
+  id             INTEGER PRIMARY KEY AUTOINCREMENT,
+  site_id        TEXT NOT NULL,
+  target_ts      TEXT NOT NULL,
+  approach       TEXT NOT NULL,
+  horizon_min    INTEGER NOT NULL,
+  demand_pred    REAL NOT NULL,
+  demand_actual  REAL NOT NULL,
+  abs_err        REAL NOT NULL,
+  made_at        TEXT NOT NULL,
+  UNIQUE(site_id, target_ts, approach, horizon_min, made_at)
+);
+CREATE INDEX IF NOT EXISTS idx_fc_score_site_target ON forecast_score(site_id, target_ts);
+CREATE INDEX IF NOT EXISTS idx_fc_score_horizon ON forecast_score(horizon_min);
+
+-- Phase 4: controller comparison runs. Reserved here so the additive
+-- migration story stays in one place.
+CREATE TABLE IF NOT EXISTS controller_runs (
+  id            INTEGER PRIMARY KEY AUTOINCREMENT,
+  ts            TEXT NOT NULL,
+  controller    TEXT NOT NULL,
+  cycle_s       REAL,
+  ns_green      REAL,
+  ew_green      REAL,
+  est_delay_s   REAL,
+  est_throughput REAL,
+  run_id        TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_ctrl_runs_run ON controller_runs(run_id);
+
 -- Bootstrap the default site used by the PoC. Idempotent via INSERT OR IGNORE.
 INSERT OR IGNORE INTO sites (site_id, name, lat, lng)
 VALUES ('wadi_saqra', 'Wadi Saqra intersection', 31.966707273799933, 35.88701562636417);

@@ -154,6 +154,31 @@ class EventEngine:
             self._fp.close()
             self._fp = None
 
+    def emit_drift_alert(
+        self,
+        check_name: str,
+        message: str,
+        severity: str = "warning",
+        approach: str | None = None,
+        payload_extra: dict | None = None,
+    ) -> dict:
+        """Public hook for the Phase 2 drift checker.
+
+        Emits a `drift_alert` incident-style event so the existing
+        incidents pipeline (NDJSON + SQLite + dashboard) handles it
+        without per-source plumbing.
+        """
+        payload = {"check": check_name, "message": message}
+        if payload_extra:
+            payload.update(payload_extra)
+        return self._emit(
+            event_type="drift_alert",
+            approach=approach,
+            severity=severity,
+            confidence=1.0,
+            payload=payload,
+        )
+
     def _emit(self, event_type: str, approach: str | None, severity: str,
               confidence: float, payload: dict, snapshot: dict | None = None,
               snapshot_jpeg: bytes | None = None) -> dict:

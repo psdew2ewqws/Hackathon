@@ -126,11 +126,69 @@ _signal_sim = SignalSimulator(
 )
 
 
+_HORIZON_KEYS = {0: "y_now", 15: "y_15min", 30: "y_30min", 60: "y_60min"}
+
+
+def _persist_forecast_payload(payload: dict, *, made_at: _dt.datetime) -> None:
+    """Push every per-approach × horizon prediction to the `forecasts` sink.
+
+    Phase 2 of the production-readiness plan. The `forecasts` table already
+    exists in schema.sql:71-82 — this just wires the sink push at the API
+    boundary. Errors swallowed because forecast persistence must never
+    break the live API path.
+    """
+    if not payload or not payload.get("available", True):
+        return
+    per_approach = payload.get("per_approach") or {}
+    if not per_approach:
+        return
+    model_version = str(payload.get("model_version") or "unknown")
+    made_at_iso = made_at.astimezone().isoformat(timespec="milliseconds")
+    for approach, preds in per_approach.items():
+        if not isinstance(preds, dict):
+            continue
+        for horizon_min, key in _HORIZON_KEYS.items():
+            if key not in preds:
+                continue
+            try:
+                target = made_at + _dt.timedelta(minutes=horizon_min)
+                _sink.push("forecast", {
+                    "site_id": _SITE_ID,
+                    "made_at": made_at_iso,
+                    "target_ts": target.astimezone().isoformat(timespec="milliseconds"),
+                    "approach": str(approach),
+                    "horizon_min": int(horizon_min),
+                    "demand_pred": float(preds[key]),
+                    "model_version": model_version,
+                })
+            except Exception:  # noqa: BLE001
+                LOG.exception("could not push forecast row")
+
+
+def _measured_lane_counts() -> dict[str, int]:
+    """Per-approach lane count derived from the loaded LaneZone config.
+
+    Returns an empty dict when no lanes are calibrated yet — Webster
+    falls back to the hardcoded `lane_count` default in that case.
+    """
+    out: dict[str, int] = {}
+    try:
+        for approach, lanes in (_tracker.counter.lane_zones or {}).items():  # type: ignore[attr-defined]
+            if lanes:
+                out[approach] = len(lanes)
+    except Exception:
+        pass
+    return out
+
+
 def _webster_for_site(fused: dict, current_plan: dict | None) -> dict:
     """Pick 2-phase or 3-phase Webster based on the site config."""
+    lane_counts = _measured_lane_counts()
     if _video_anchor is not None or (_site.get("signal") or {}).get("mode") == "three_phase":
-        return webster_three_phase(fused, current_plan=current_plan)
-    return webster_two_phase(fused, current_plan=current_plan)
+        return webster_three_phase(fused, current_plan=current_plan,
+                                   lane_counts=lane_counts or None)
+    return webster_two_phase(fused, current_plan=current_plan,
+                             lane_counts=lane_counts or None)
 
 _event_engine = EventEngine(
     ndjson_path=EVENTS_NDJSON,
@@ -258,6 +316,9 @@ def _tracker_on_bin(bin_record: dict) -> None:
             a: {
                 "in_zone": c.get("in_zone", 0),
                 "crossings_in_bin": (bin_record.get("crossings_in_bin") or {}).get(a, 0),
+                "in_zone_pce": c.get("in_zone_pce"),
+                "crossings_pce_in_bin": (bin_record.get("crossings_pce_in_bin") or {}).get(a),
+                "mix": c.get("mix"),
             }
             for a, c in (_tracker.state.counts or {}).items()
         }
@@ -641,6 +702,206 @@ async def api_health() -> dict:
     }
 
 
+@app.get("/api/tracker/backend")
+async def api_tracker_backend_get() -> dict:
+    """Public read of which detector backend is currently producing boxes."""
+    return _tracker.list_backends()
+
+
+class _BackendSwitchBody(BaseModel):
+    backend: str
+
+
+@app.post("/api/tracker/backend")
+async def api_tracker_backend_set(
+    body: _BackendSwitchBody,
+    ctx: AuthContext = Depends(require_role("operator")),
+) -> dict:
+    """Hot-swap the live detector backend. Operator role required."""
+    try:
+        new_state = _tracker.set_backend(body.backend)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return new_state
+
+
+# ─── Phase 1.5 lane induction + calibration endpoints ─────────────────────
+
+
+def _lanespec_to_jsonable(ls) -> dict:
+    """Convert a `LaneSpec` (or runtime `LaneZone`) into a JSON-friendly dict."""
+    return {
+        "lane_id": ls.lane_id,
+        "lane_idx": ls.lane_idx,
+        "lane_type": ls.lane_type,
+        "polygon": ls.polygon.tolist(),
+        "centerline": ls.centerline.tolist() if hasattr(ls, "centerline") else [],
+    }
+
+
+@app.get("/api/lanes/state")
+async def api_lanes_state() -> dict:
+    """Per-lane snapshot for every approach. Empty `lanes` ⇒ no calibration yet."""
+    snap = _tracker.state.counts or {}
+    saved: dict[str, list[dict]] = {}
+    if _tracker.counter is not None:
+        for approach, lanes in (_tracker.counter.lane_zones or {}).items():
+            saved[approach] = [_lanespec_to_jsonable(lz) for lz in lanes]
+    return {
+        "saved_lanes": saved,
+        "live": {a: snap.get(a, {}).get("lanes", {}) for a in snap},
+    }
+
+
+@app.get("/api/lanes/proposed")
+async def api_lanes_proposed(
+    ctx: AuthContext = Depends(require_role("operator")),
+) -> dict:
+    """Run trajectory clustering on the trajectory buffer; return proposed lanes.
+
+    Heavy compute (pairwise Fréchet) is dispatched to a worker thread via
+    `asyncio.to_thread` so it doesn't block uvicorn's event loop while the
+    cluster math runs.
+    """
+    import asyncio
+
+    from .lanes import induce_lanes_from_trajectories
+
+    if _tracker.trajectory_buffer is None or _tracker.counter is None:
+        raise HTTPException(status_code=503, detail="tracker not ready")
+    tracks = _tracker.trajectory_buffer.all_trajectories_for_induction()
+    if len(tracks) < 8:
+        return {
+            "warning": f"only {len(tracks)} trajectories buffered; let traffic flow for ~30s and retry",
+            "trajectories_seen": len(tracks),
+            "proposed": {},
+        }
+    proposed = await asyncio.to_thread(
+        induce_lanes_from_trajectories, tracks, _tracker.counter.zones,
+    )
+    return {
+        "trajectories_seen": len(tracks),
+        "proposed": {
+            approach: [_lanespec_to_jsonable(ls) for ls in lanes]
+            for approach, lanes in proposed.items()
+        },
+    }
+
+
+class _LaneCalibrationBody(BaseModel):
+    # Each approach maps to a list of lane dicts; shape mirrors LaneSpec.
+    lanes: dict[str, list[dict]]
+
+
+@app.post("/api/lanes/calibrate")
+async def api_lanes_calibrate(
+    body: _LaneCalibrationBody,
+    ctx: AuthContext = Depends(require_role("operator")),
+) -> dict:
+    """Persist operator-edited lanes into wadi_saqra_zones.json (atomic write)."""
+    import json as _json
+    import tempfile
+
+    zones_path = _tracker.cfg.zones_path
+    try:
+        with zones_path.open() as fp:
+            cfg = _json.load(fp)
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=500, detail=f"could not read zones config: {exc}") from exc
+
+    by_approach = {z["approach"]: z for z in cfg.get("zones", [])}
+    written = 0
+    for approach, lanes in body.lanes.items():
+        z = by_approach.get(approach)
+        if z is None:
+            continue
+        # Validate each lane dict has the expected keys before persisting.
+        clean = []
+        for ln in lanes:
+            try:
+                clean.append({
+                    "lane_id": str(ln["lane_id"]),
+                    "lane_idx": int(ln["lane_idx"]),
+                    "lane_type": str(ln.get("lane_type", "shared")),
+                    "polygon": [[int(x), int(y)] for x, y in ln["polygon"]],
+                    "centerline": [[float(x), float(y)] for x, y in ln.get("centerline", [])],
+                })
+            except (KeyError, TypeError, ValueError) as exc:
+                raise HTTPException(status_code=400,
+                                    detail=f"bad lane shape for {approach}: {exc}") from exc
+        z["lanes"] = clean
+        written += len(clean)
+
+    # Atomic write: temp + rename.
+    tmp = tempfile.NamedTemporaryFile(
+        mode="w", suffix=".json", dir=zones_path.parent, delete=False,
+    )
+    try:
+        _json.dump(cfg, tmp, indent=2)
+        tmp.flush()
+        tmp.close()
+        Path(tmp.name).replace(zones_path)
+    except Exception:
+        Path(tmp.name).unlink(missing_ok=True)
+        raise
+
+    # Reload the live counter so the new lanes take effect immediately.
+    from .counters import load_lane_zones, load_zones
+    new_zones = load_zones(zones_path)
+    new_lane_zones = load_lane_zones(zones_path)
+    if _tracker.counter is not None:
+        _tracker.counter.zones = new_zones
+        _tracker.counter.lane_zones = {z.approach: [] for z in new_zones}
+        _tracker.counter.lane_state = {z.approach: {} for z in new_zones}
+        for lz in new_lane_zones:
+            _tracker.counter.lane_zones.setdefault(lz.approach, []).append(lz)
+            from .counters import LaneState
+            _tracker.counter.lane_state.setdefault(lz.approach, {})[lz.lane_id] = LaneState(
+                lane_id=lz.lane_id, lane_idx=lz.lane_idx, lane_type=lz.lane_type,
+            )
+
+    return {"saved": True, "lanes_written": written}
+
+
+@app.get("/api/lanes/drift")
+async def api_lanes_drift() -> dict:
+    """Compare saved lane centerlines against freshly-induced ones.
+
+    Per-approach max Hausdorff distance (pixels). Larger ⇒ more drift.
+    `inf` for any approach where the lane count differs (strongest signal).
+    Phase 2's `observability/drift.py` will wrap this into an incident
+    `drift_alert: lane_geometry_changed`; for now this endpoint is the
+    on-demand probe.
+    """
+    import asyncio
+
+    from .lanes import LaneSpec, induce_lanes_from_trajectories, lane_geometry_drift
+
+    if _tracker.trajectory_buffer is None or _tracker.counter is None:
+        raise HTTPException(status_code=503, detail="tracker not ready")
+    tracks = _tracker.trajectory_buffer.all_trajectories_for_induction()
+    if len(tracks) < 8:
+        return {"trajectories_seen": len(tracks), "drift": {}}
+    induced = await asyncio.to_thread(
+        induce_lanes_from_trajectories, tracks, _tracker.counter.zones,
+    )
+
+    drift: dict[str, float] = {}
+    for approach, saved_lzs in (_tracker.counter.lane_zones or {}).items():
+        if not saved_lzs:
+            continue
+        # Wrap LaneZone (runtime) as LaneSpec for the comparator.
+        saved_specs = [
+            LaneSpec(
+                approach=lz.approach, lane_id=lz.lane_id, lane_idx=lz.lane_idx,
+                lane_type=lz.lane_type, polygon=lz.polygon, centerline=lz.centerline,
+            ) for lz in saved_lzs
+        ]
+        induced_specs = induced.get(approach, [])
+        drift[approach] = lane_geometry_drift(saved_specs, induced_specs)
+    return {"trajectories_seen": len(tracks), "drift": drift}
+
+
 @app.get("/api/site")
 async def api_site() -> dict:
     return _site
@@ -675,11 +936,15 @@ async def api_gmaps(hour: float | None = None) -> dict:
 async def api_fusion() -> dict:
     s = _tracker.state
     rows = load_gmaps(_gmaps_path, _gmaps_hour)
-    merged: dict[str, dict[str, int]] = {}
+    merged: dict[str, dict] = {}
     for approach, c in s.counts.items():
         merged[approach] = {
             "in_zone": c.get("in_zone", 0),
             "crossings_in_bin": s.crossings_in_current_bin.get(approach, 0),
+            # PCE-aware fields (Phase 1). Missing keys fall back inside fuse().
+            "in_zone_pce": c.get("in_zone_pce"),
+            "crossings_pce_in_bin": s.crossings_pce_in_current_bin.get(approach),
+            "mix": c.get("mix"),
         }
     fused = fuse(merged, bin_seconds=s.bin_seconds, gmaps_rows=rows)
     return {"local_hour": _gmaps_hour, "fused": fused}
@@ -747,6 +1012,10 @@ async def api_forecast_ml(target: str | None = None) -> dict:
         except Exception as exc:
             raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=f"bad target: {exc}")
     payload = forecast_ml_horizons(target_ts=parsed_ts)
+    # Phase 2: persist every prediction so the divergence dashboard can
+    # later join it against actual counts. _sink.push is async-batched so
+    # this doesn't block the request path.
+    _persist_forecast_payload(payload, made_at=_dt.datetime.now(_dt.timezone.utc))
     # Attach calendar context.
     ref = parsed_ts or _dt.datetime.now()
     hol, name = is_holiday(ref)
@@ -960,6 +1229,9 @@ def _llm_live_state_provider() -> dict:
         a: {
             "in_zone": c.get("in_zone", 0),
             "crossings_in_bin": s.crossings_in_current_bin.get(a, 0),
+            "in_zone_pce": c.get("in_zone_pce"),
+            "crossings_pce_in_bin": s.crossings_pce_in_current_bin.get(a),
+            "mix": c.get("mix"),
         }
         for a, c in (s.counts or {}).items()
     }
@@ -1024,6 +1296,9 @@ def _llm_recommendation_provider(scope: str) -> dict:
         a: {
             "in_zone": c.get("in_zone", 0),
             "crossings_in_bin": s.crossings_in_current_bin.get(a, 0),
+            "in_zone_pce": c.get("in_zone_pce"),
+            "crossings_pce_in_bin": s.crossings_pce_in_current_bin.get(a),
+            "mix": c.get("mix"),
         }
         for a, c in (s.counts or {}).items()
     }

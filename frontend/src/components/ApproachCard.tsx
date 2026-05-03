@@ -104,7 +104,81 @@ export function ApproachCard({
         >
           <Pill label={fused?.label ?? 'free'} />
           <span style={{ opacity: 0.7 }}>pressure={fmt(fused?.pressure, 2)}</span>
+          {fused?.in_zone_pce != null && (
+            <span style={{ opacity: 0.55 }}>
+              PCE={fmt(fused.in_zone_pce, 1)}
+            </span>
+          )}
         </div>
+        {fused?.mix && Object.keys(fused.mix).length > 0 && (
+          <ClassMixBar mix={fused.mix} />
+        )}
+      </div>
+    </div>
+  );
+}
+
+const CLASS_COLOR: Record<string, string> = {
+  car: '#4ade80',         // green
+  truck: '#60a5fa',       // blue
+  bus: '#f472b6',         // pink
+  motorcycle: '#fbbf24',  // amber
+  bicycle: '#a78bfa',     // violet
+  person: '#fb923c',      // orange
+};
+
+function ClassMixBar({ mix }: { mix: Record<string, number> }) {
+  const total = Object.values(mix).reduce((a, b) => a + b, 0);
+  if (total === 0) return null;
+  const entries = Object.entries(mix).sort(
+    ([, a], [, b]) => b - a,
+  );
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+      <div
+        style={{
+          display: 'flex',
+          height: 6,
+          borderRadius: 3,
+          overflow: 'hidden',
+          background: '#1e2630',
+        }}
+        title={entries.map(([k, v]) => `${k}: ${v}`).join('  ')}
+      >
+        {entries.map(([cls, n]) => (
+          <div
+            key={cls}
+            style={{
+              width: `${(n / total) * 100}%`,
+              background: CLASS_COLOR[cls.toLowerCase()] ?? '#94a3b8',
+            }}
+          />
+        ))}
+      </div>
+      <div
+        style={{
+          display: 'flex',
+          gap: 8,
+          fontSize: 11,
+          opacity: 0.7,
+          flexWrap: 'wrap',
+        }}
+      >
+        {entries.map(([cls, n]) => (
+          <span key={cls}>
+            <span
+              style={{
+                display: 'inline-block',
+                width: 8,
+                height: 8,
+                borderRadius: 2,
+                background: CLASS_COLOR[cls.toLowerCase()] ?? '#94a3b8',
+                marginRight: 4,
+              }}
+            />
+            {cls}&nbsp;{n}
+          </span>
+        ))}
       </div>
     </div>
   );

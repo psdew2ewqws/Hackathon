@@ -39,6 +39,9 @@ llm = [
     # Without this extra installed and the env var set, the chat endpoint
     # returns 503 and no outbound calls happen — see §7.7.
     "anthropic>=0.40",
+    # MCP server: exposes the same 7 tools the in-app chat uses to any
+    # external MCP client (Claude Desktop, Cursor, agents). Stdio only.
+    "mcp>=1.0",
 ]
 kafka = [
     "aiokafka>=0.11",

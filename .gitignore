@@ -63,6 +63,7 @@ data/research/composed/
 
 # Large / non-reproducible local artifacts (keep out of GitHub)
 *.pt
+*.pth
 .playwright-mcp/
 data/_sigill_backup_*/
 data/forecast/
@@ -70,6 +71,12 @@ data/metadata/backups/
 data/normalized/scenarios/
 data/raw/scenarios/
 data/research/
+
+# Detector swap benchmark output (regenerable via scripts/bench_detectors.py)
+bench/
+
+# Developer-local venv symlink (path differs per machine — see project memory)
+/.venv
 
 # Frontend build artifacts + node_modules
 frontend/node_modules/

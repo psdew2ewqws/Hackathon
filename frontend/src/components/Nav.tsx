@@ -15,6 +15,8 @@ const NAV_ITEMS: NavItem[] = [
   { to: '/forecast', label: 'Forecast', minRole: 'operator' },
   { to: '/incidents', label: 'Incidents', minRole: 'operator' },
   { to: '/history', label: 'History', minRole: 'operator' },
+  { to: '/lanes', label: 'Lanes', minRole: 'operator' },
+  { to: '/chat', label: 'Chat', minRole: 'operator' },
   { to: '/system', label: 'System', minRole: 'admin' },
   { to: '/audit', label: 'Audit', minRole: 'admin' },
 ];

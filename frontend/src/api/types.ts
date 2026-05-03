@@ -79,6 +79,10 @@ export interface FusedRow {
   gmaps_speed_kmh: number;
   pressure: number;
   label: string;
+  // Phase 1 PCE-aware fields. Optional so old responses still parse.
+  in_zone_pce?: number;
+  pce_demand_per_min?: number;
+  mix?: Record<string, number>;
 }
 
 export interface FusionResponse {

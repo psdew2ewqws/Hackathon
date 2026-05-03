@@ -12,6 +12,8 @@ import { SystemPage } from './pages/SystemPage';
 import { AuditPage } from './pages/AuditPage';
 import { AnalysisPage } from './pages/AnalysisPage';
 import { SignalTimingPage } from './pages/SignalTimingPage';
+import { LaneCalibrationPage } from './pages/LaneCalibrationPage';
+import { ChatPage } from './pages/ChatPage';
 
 function Shell({ children }: { children: React.ReactNode }) {
   const location = useLocation();
@@ -94,6 +96,22 @@ export default function App() {
               element={
                 <RequireAuth minRole="admin">
                   <AuditPage />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/lanes"
+              element={
+                <RequireAuth minRole="operator">
+                  <LaneCalibrationPage />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/chat"
+              element={
+                <RequireAuth minRole="operator">
+                  <ChatPage />
                 </RequireAuth>
               }
             />
