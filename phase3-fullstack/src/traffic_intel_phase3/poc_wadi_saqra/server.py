@@ -1408,7 +1408,13 @@ def _llm_live_state_provider() -> dict:
     }
     fused = fuse(merged, bin_seconds=s.bin_seconds, gmaps_rows=rows)
     sim_state = _signal_sim.state if _signal_sim else None
-    current_phase = sim_state.current.__dict__ if sim_state and sim_state.current else None
+    # SignalSimState.current is already a dict (see signal_sim.py:_publish);
+    # earlier code accessed .__dict__ on the assumption it was a dataclass.
+    raw_phase = sim_state.current if sim_state else None
+    current_phase = (
+        dict(raw_phase) if isinstance(raw_phase, dict)
+        else (raw_phase.__dict__ if raw_phase else None)
+    )
     return {
         "local_hour": _gmaps_hour,
         "fused": fused,
