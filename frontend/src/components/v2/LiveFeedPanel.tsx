@@ -10,9 +10,15 @@ interface HealthSnapshot {
 
 interface BackendInfo {
   active: string;
-  label: string;
   pending: string | null;
+  loaded: string[];
+  label: string;
 }
+
+const BACKEND_NAME: Record<string, string> = {
+  rfdetr: 'RF-DETR base',
+  ultralytics: 'YOLO 26n',
+};
 
 export function LiveFeedPanel() {
   const [health, setHealth] = useState<HealthSnapshot | null>(null);
@@ -32,7 +38,7 @@ export function LiveFeedPanel() {
         if (h) setHealth(h);
         if (b) setBackend(b);
       } catch {
-        /* next tick retries */
+        /* keep last good */
       }
     };
     tick();
@@ -45,7 +51,15 @@ export function LiveFeedPanel() {
 
   const fps = health?.tracker?.fps ?? 0;
   const running = !!health?.tracker?.running;
-  const dotColor = running ? 'var(--good)' : 'var(--bad)';
+  const incidents = health?.storage?.incidents ?? 0;
+  const cycleCounts = health?.storage?.counts ?? 0;
+  const dotColor = running
+    ? 'var(--good)'
+    : backend?.pending
+    ? 'var(--accent)'
+    : 'var(--fg-faint)';
+  const activeName = backend?.active ? BACKEND_NAME[backend.active] ?? backend.active : '—';
+  const pendingName = backend?.pending ? BACKEND_NAME[backend.pending] : null;
 
   return (
     <div
@@ -53,62 +67,93 @@ export function LiveFeedPanel() {
         background: 'var(--surface-2)',
         border: '1px solid var(--border-soft)',
         borderRadius: 'var(--r-md)',
-        padding: 12,
+        padding: 14,
+        display: 'flex',
+        flexDirection: 'column',
+        height: '100%',
       }}
     >
       <div
         style={{
           display: 'flex',
           justifyContent: 'space-between',
-          alignItems: 'baseline',
-          marginBottom: 10,
+          alignItems: 'flex-end',
+          marginBottom: 12,
         }}
       >
-        <div
-          style={{
-            font: '600 11px var(--mono)',
-            letterSpacing: '0.12em',
-            textTransform: 'uppercase',
-            color: 'var(--fg-dim)',
-          }}
-        >
-          Annotated RTSP feed
+        <div>
+          <div
+            style={{
+              font: 'italic 400 26px var(--display)',
+              color: 'var(--fg)',
+              letterSpacing: '-0.015em',
+              lineHeight: 1,
+            }}
+          >
+            Live feed
+          </div>
+          <div
+            style={{
+              font: '500 9px var(--mono)',
+              letterSpacing: '0.18em',
+              textTransform: 'uppercase',
+              color: 'var(--fg-faint)',
+              marginTop: 5,
+            }}
+          >
+            wadi saqra · 848 × 478 · annotated
+          </div>
         </div>
-        <div
-          style={{
-            display: 'flex',
-            gap: 12,
-            alignItems: 'center',
-            font: '500 10px var(--mono)',
-            color: 'var(--fg-faint)',
-          }}
-        >
-          <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+        <div style={{ textAlign: 'right' }}>
+          <div
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 7,
+              font: '600 11px var(--mono)',
+              color: dotColor,
+              letterSpacing: '0.04em',
+            }}
+          >
             <span
+              className={running ? 'dot-pulse' : ''}
               style={{
-                width: 7,
-                height: 7,
+                width: 8,
+                height: 8,
                 borderRadius: '50%',
                 background: dotColor,
+                boxShadow: running ? `0 0 10px ${dotColor}` : 'none',
                 display: 'inline-block',
               }}
             />
-            {running ? `${fps.toFixed(1)} fps` : 'idle'}
-          </span>
-          {backend?.label && (
-            <span style={{ color: 'var(--accent)' }}>{backend.label}</span>
-          )}
+            {running ? `${fps.toFixed(1)} FPS` : pendingName ? 'WARMING' : 'IDLE'}
+          </div>
+          <div
+            style={{
+              font: '500 9px var(--mono)',
+              letterSpacing: '0.16em',
+              textTransform: 'uppercase',
+              color: 'var(--fg-faint)',
+              marginTop: 4,
+            }}
+          >
+            {pendingName ? `loading ${pendingName}` : `via ${activeName}`}
+          </div>
         </div>
       </div>
 
       <div
+        className="scanlines"
         style={{
           position: 'relative',
           width: '100%',
+          flex: '1 1 auto',
           background: '#000',
-          borderRadius: 6,
+          borderRadius: 'var(--r-md)',
           overflow: 'hidden',
           aspectRatio: '848 / 478',
+          border: '1px solid var(--border)',
+          boxShadow: 'var(--shadow-1)',
         }}
       >
         <img
@@ -121,12 +166,69 @@ export function LiveFeedPanel() {
             objectFit: 'cover',
           }}
         />
+
+        {/* Active-detector chip overlay */}
+        <div
+          style={{
+            position: 'absolute',
+            top: 12,
+            right: 12,
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 6,
+            padding: '5px 10px',
+            background: 'rgba(12, 13, 16, 0.78)',
+            backdropFilter: 'blur(8px)',
+            border: '1px solid rgba(255, 177, 0, 0.35)',
+            borderRadius: 999,
+            font: '600 10px var(--mono)',
+            color: 'var(--accent)',
+            letterSpacing: '0.12em',
+            textTransform: 'uppercase',
+          }}
+        >
+          <span
+            className="dot-pulse"
+            style={{
+              width: 6,
+              height: 6,
+              borderRadius: '50%',
+              background: 'var(--accent)',
+              boxShadow: '0 0 8px var(--accent)',
+            }}
+          />
+          {activeName}
+        </div>
+
+        {/* Bottom telemetry strip */}
+        <div
+          style={{
+            position: 'absolute',
+            left: 0,
+            right: 0,
+            bottom: 0,
+            padding: '10px 14px',
+            background:
+              'linear-gradient(180deg, transparent, rgba(12,13,16,0.85) 70%)',
+            display: 'flex',
+            justifyContent: 'space-between',
+            font: '500 10px var(--mono)',
+            letterSpacing: '0.08em',
+            textTransform: 'uppercase',
+            color: 'var(--fg-dim)',
+          }}
+        >
+          <span>RTSP · 127.0.0.1:8554 / wadi_saqra</span>
+          <span>
+            {cycleCounts.toLocaleString()} bins · {incidents.toLocaleString()} incidents
+          </span>
+        </div>
       </div>
 
       {health?.tracker?.last_error && (
         <div
           style={{
-            marginTop: 8,
+            marginTop: 10,
             font: '500 11px var(--mono)',
             color: 'var(--bad)',
           }}

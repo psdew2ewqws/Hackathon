@@ -1,4 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { AIPipelineStrip } from '../components/v2/AIPipelineStrip';
+import { AIStackPanel } from '../components/v2/AIStackPanel';
 import { ForecastStrip } from '../components/v2/ForecastStrip';
 import { HeatmapPanel } from '../components/v2/HeatmapPanel';
 import { LiveEventsPanel } from '../components/v2/LiveEventsPanel';
@@ -14,42 +16,168 @@ function nowHalfHour(): number {
   return Math.max(0, Math.min(23.5, h));
 }
 
+function useClock(): string {
+  const [now, setNow] = useState<Date>(new Date());
+  useEffect(() => {
+    const id = window.setInterval(() => setNow(new Date()), 1000);
+    return () => window.clearInterval(id);
+  }, []);
+  return now.toLocaleTimeString([], {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+  });
+}
+
 export function DashboardV2() {
   const [selectedHour, setSelectedHour] = useState<number>(nowHalfHour());
+  const clock = useClock();
 
   return (
     <div
       style={{
-        maxWidth: 1440,
+        position: 'relative',
+        zIndex: 1,
+        maxWidth: 1480,
         margin: '0 auto',
-        padding: '20px 24px 60px',
+        padding: '24px 28px 60px',
         color: 'var(--fg)',
       }}
     >
-      <div style={{ marginBottom: 16 }}>
-        <h1
-          style={{
-            font: '600 22px var(--sans)',
-            margin: 0,
-            color: 'var(--fg)',
-            letterSpacing: '-0.01em',
-          }}
-        >
-          Wadi Saqra · Dashboard
-        </h1>
+      {/* ─── Editorial header ──────────────────────────────────────── */}
+      <header
+        className="rise"
+        style={{
+          display: 'grid',
+          gridTemplateColumns: '1fr auto',
+          alignItems: 'flex-end',
+          gap: 16,
+          marginBottom: 22,
+          paddingBottom: 18,
+          borderBottom: '1px solid var(--border-soft)',
+        }}
+      >
+        <div>
+          <div
+            style={{
+              font: '600 9px var(--mono)',
+              letterSpacing: '0.32em',
+              textTransform: 'uppercase',
+              color: 'var(--accent)',
+              marginBottom: 8,
+            }}
+          >
+            Wadi Saqra · operations
+          </div>
+          <h1
+            style={{
+              font: '400 56px/0.92 var(--display)',
+              fontStyle: 'italic',
+              margin: 0,
+              letterSpacing: '-0.02em',
+              color: 'var(--fg)',
+            }}
+          >
+            traffic intel{' '}
+            <span
+              style={{
+                fontStyle: 'normal',
+                color: 'var(--fg-faint)',
+                fontSize: '0.4em',
+                letterSpacing: '0.18em',
+                textTransform: 'uppercase',
+                fontFamily: 'var(--mono)',
+                fontWeight: 600,
+                verticalAlign: 'middle',
+                marginLeft: 14,
+              }}
+            >
+              v2 · dashboard
+            </span>
+          </h1>
+          <div
+            style={{
+              font: '400 13px var(--sans)',
+              color: 'var(--fg-dim)',
+              marginTop: 8,
+              maxWidth: 700,
+            }}
+          >
+            Six AI models, one signalised intersection.{' '}
+            <span style={{ color: 'var(--ai)' }}>RF-DETR / YOLO</span> see the
+            scene · <span style={{ color: 'var(--accent)' }}>ByteTrack</span>{' '}
+            counts the cars · <span style={{ color: '#a78bfa' }}>LightGBM</span>{' '}
+            predicts the next hour · <span style={{ color: '#7FA889' }}>Webster–HCM</span>{' '}
+            recommends green-time splits · <span style={{ color: '#f0a5d4' }}>Claude/MCP</span>{' '}
+            answers questions about all of it.
+          </div>
+        </div>
         <div
           style={{
-            font: '400 12px var(--mono)',
-            color: 'var(--fg-faint)',
-            marginTop: 2,
+            textAlign: 'right',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'flex-end',
+            gap: 4,
           }}
         >
-          live feed · KPIs · signal phase · 24h heatmap · forecast horizons · webster · events
+          <div
+            style={{
+              font: '500 9px var(--mono)',
+              letterSpacing: '0.2em',
+              textTransform: 'uppercase',
+              color: 'var(--fg-faint)',
+            }}
+          >
+            local time · amman
+          </div>
+          <div
+            style={{
+              font: 'italic 400 38px var(--display)',
+              color: 'var(--fg)',
+              letterSpacing: '-0.01em',
+              lineHeight: 1,
+            }}
+          >
+            {clock}
+          </div>
+          <div
+            style={{
+              font: '500 9px var(--mono)',
+              letterSpacing: '0.16em',
+              textTransform: 'uppercase',
+              color: 'var(--fg-faint)',
+              marginTop: 2,
+            }}
+          >
+            cycle 120s · 3-phase
+          </div>
         </div>
+      </header>
+
+      {/* ─── Hero: Live feed (60%) | AI Stack (40%) ──────────────── */}
+      <div
+        className="rise rise-d-1"
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'minmax(0, 1.55fr) minmax(360px, 1fr)',
+          gap: 16,
+          marginBottom: 16,
+        }}
+      >
+        <LiveFeedPanel />
+        <AIStackPanel />
       </div>
 
-      {/* Top row: live feed (left) | KPIs + signal state (right) */}
+      {/* ─── Pipeline strip ──────────────────────────────────────── */}
+      <div className="rise rise-d-2">
+        <AIPipelineStrip />
+      </div>
+
+      {/* ─── KPIs + signal state ─────────────────────────────────── */}
       <div
+        className="rise rise-d-3"
         style={{
           display: 'grid',
           gridTemplateColumns: 'minmax(0, 1.4fr) minmax(0, 1fr)',
@@ -57,19 +185,24 @@ export function DashboardV2() {
           marginBottom: 14,
         }}
       >
-        <LiveFeedPanel />
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-          <LiveKpiRow />
-          <LiveSignalState />
-        </div>
+        <LiveKpiRow />
+        <LiveSignalState />
       </div>
 
-      <HeatmapPanel selectedHour={selectedHour} onSelectHour={setSelectedHour} />
-      <ForecastStrip />
-      <WebsterBar />
+      {/* ─── Heatmap ─────────────────────────────────────────────── */}
+      <div className="rise rise-d-4">
+        <HeatmapPanel selectedHour={selectedHour} onSelectHour={setSelectedHour} />
+      </div>
 
-      {/* Bottom row: live events | recent signal events */}
+      {/* ─── Forecast + Webster ──────────────────────────────────── */}
+      <div className="rise rise-d-5">
+        <ForecastStrip />
+        <WebsterBar />
+      </div>
+
+      {/* ─── Events feeds ────────────────────────────────────────── */}
       <div
+        className="rise rise-d-6"
         style={{
           display: 'grid',
           gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)',
@@ -79,6 +212,27 @@ export function DashboardV2() {
         <LiveEventsPanel />
         <RecentSignalPanel />
       </div>
+
+      {/* ─── Footer credit ───────────────────────────────────────── */}
+      <footer
+        style={{
+          marginTop: 28,
+          paddingTop: 18,
+          borderTop: '1px solid var(--border-soft)',
+          display: 'flex',
+          justifyContent: 'space-between',
+          font: '500 10px var(--mono)',
+          letterSpacing: '0.12em',
+          textTransform: 'uppercase',
+          color: 'var(--fg-faint)',
+        }}
+      >
+        <span>traffic intel · phase-3</span>
+        <span style={{ color: 'var(--fg-dim)' }}>
+          rtsp · mediamtx · fastapi · sqlite · react · mcp
+        </span>
+        <span>amman · jordan · hackathon 2026</span>
+      </footer>
     </div>
   );
 }
