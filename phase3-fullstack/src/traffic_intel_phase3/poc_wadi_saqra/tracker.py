@@ -504,12 +504,13 @@ class TrackerService:
     ) -> bytes:
         img = frame.copy()
 
-        # Approach polygons: dim them down once lanes have been calibrated
-        # — the lane sub-polygons take over as the primary visual signal.
+        # Approach polygons: always rendered so the operator can see the
+        # calibrated zones even when no lanes are saved. Alpha is dimmer
+        # when lanes are present (lanes get drawn on top); a touch stronger
+        # when lanes are absent so the polygons read clearly on their own.
         has_lanes = bool(self.counter and self.counter.lane_zones
                          and any(self.counter.lane_zones.values()))
-        approach_alpha = 0.10 if has_lanes else 0.20
-
+        approach_alpha = 0.10 if has_lanes else 0.22
         overlay = img.copy()
         for z in zones:
             color = APPROACH_BGR.get(z.approach, (200, 200, 200))
@@ -549,10 +550,11 @@ class TrackerService:
                     mid = cl[len(cl) // 2]
                     px, py = int(mid[0]), int(mid[1])
                     label = f"{lz.lane_id} {lz.lane_type}"
-                    (tw, th), _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 1)
+                    lane_fs = max(0.35, 0.5 * (img.shape[1] / 1920.0))
+                    (tw, th), _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, lane_fs, 1)
                     cv2.rectangle(img, (px - 2, py - th - 6), (px + tw + 4, py + 2), (10, 14, 22), -1)
                     cv2.putText(img, label, (px + 2, py - 4),
-                                cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1, cv2.LINE_AA)
+                                cv2.FONT_HERSHEY_SIMPLEX, lane_fs, (255, 255, 255), 1, cv2.LINE_AA)
 
         # boxes + class fills + labels from supervision.Detections.
         # Filled interior is rendered to a separate overlay so we can blend
@@ -590,32 +592,50 @@ class TrackerService:
                 conf = float(confidences[i]) if confidences is not None and i < len(confidences) else 0.0
                 tid = int(tids[i]) if tids is not None and tids[i] is not None and i < len(tids) else None
 
-                cv2.rectangle(img, (x1, y1), (x2, y2), color, 2)
+                # Scale box outline + label font with frame width so they
+                # stay readable on smaller streams (e.g. 848x478) without
+                # overpowering them at 1080p.
+                s = img.shape[1] / 1920.0
+                box_thick = 2 if img.shape[1] >= 1280 else 1
+                box_fs = max(0.35, 0.5 * s)
+                cv2.rectangle(img, (x1, y1), (x2, y2), color, box_thick)
 
                 tag = f"#{tid} " if tid is not None else ""
                 label = f"{tag}{cls_name} {conf:.2f}"
                 (tw, th), _ = cv2.getTextSize(
-                    label, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 1)
-                lx1, ly1 = x1, max(0, y1 - th - 8)
-                lx2, ly2 = x1 + tw + 10, ly1 + th + 8
+                    label, cv2.FONT_HERSHEY_SIMPLEX, box_fs, 1)
+                lx1, ly1 = x1, max(0, y1 - th - 6)
+                lx2, ly2 = x1 + tw + 8, ly1 + th + 6
                 cv2.rectangle(img, (lx1, ly1), (lx2, ly2), color, -1)
-                cv2.putText(img, label, (lx1 + 5, ly2 - 4),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (10, 14, 22), 1,
+                cv2.putText(img, label, (lx1 + 4, ly2 - 3),
+                            cv2.FONT_HERSHEY_SIMPLEX, box_fs, (10, 14, 22), 1,
                             cv2.LINE_AA)
 
-        # HUD: backend tag + per-approach counters
-        pad = 10
+        # HUD: backend tag + per-approach counters. Scale block width,
+        # row height, and font with frame width so the panel doesn't
+        # dominate small streams.
+        s = img.shape[1] / 1920.0
+        pad = max(6, int(10 * s))
+        hud_w = max(180, int(360 * s))
+        row_h = max(16, int(30 * s))
+        fs_hdr = max(0.42, 0.6 * s)
+        fs_row = max(0.42, 0.65 * s)
+        hud_thick = 2 if img.shape[1] >= 1280 else 1
+        hdr_h = int(row_h * 0.95)
         backend_txt = f"DETECTOR: {self._backend_label}"
-        cv2.rectangle(img, (pad, 4), (pad + 360, 30), (0, 0, 0), -1)
-        cv2.putText(img, backend_txt, (pad + 6, 24),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 220, 255), 2, cv2.LINE_AA)
+        cv2.rectangle(img, (pad, 4), (pad + hud_w, 4 + hdr_h), (0, 0, 0), -1)
+        cv2.putText(img, backend_txt, (pad + 6, 4 + int(hdr_h * 0.78)),
+                    cv2.FONT_HERSHEY_SIMPLEX, fs_hdr, (0, 220, 255), hud_thick,
+                    cv2.LINE_AA)
         for i, (a, v) in enumerate(snap.items()):
             color = APPROACH_BGR.get(a, (200, 200, 200))
             txt = f"{a}: in={v['in_zone']}  cross={v['crossings_total']}"
-            y = 60 + i * 30
-            cv2.rectangle(img, (pad, y - 22), (pad + 360, y + 6), (0, 0, 0), -1)
+            y = 4 + hdr_h + (i + 1) * row_h
+            cv2.rectangle(img, (pad, y - int(row_h * 0.78)),
+                          (pad + hud_w, y + int(row_h * 0.18)), (0, 0, 0), -1)
             cv2.putText(img, txt, (pad + 6, y),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.65, color, 2, cv2.LINE_AA)
+                        cv2.FONT_HERSHEY_SIMPLEX, fs_row, color, hud_thick,
+                        cv2.LINE_AA)
 
         ok, buf = cv2.imencode(".jpg", img, [cv2.IMWRITE_JPEG_QUALITY, 80])
         return buf.tobytes() if ok else b""

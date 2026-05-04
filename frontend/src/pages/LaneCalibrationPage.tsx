@@ -1,5 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { apiUrl } from '../api/client';
+import {
+  centerlineFromPolygon,
+  equalDivideApproach,
+  laneTypeFor,
+} from '../lib/laneGeometry';
 
 type LaneType = 'left' | 'through' | 'right' | 'shared';
 type Approach = 'N' | 'S' | 'E' | 'W';
@@ -18,6 +23,12 @@ interface ProposedResponse {
   warning?: string;
 }
 
+interface ApproachGeometry {
+  approach_polygon: number[][];          // 4-vertex outer polygon
+  stop_line: [number, number][] | null;  // 2-point edge
+  direction_of_travel: string;
+}
+
 interface StateResponse {
   saved_lanes: Record<string, LaneSpec[]>;
   live: Record<string, Record<string, {
@@ -26,6 +37,7 @@ interface StateResponse {
     crossings_total: number;
     lane_type: string;
   }>>;
+  approach_geometry?: Record<string, ApproachGeometry>;
 }
 
 const LANE_FILL: Record<string, string> = {
@@ -63,6 +75,8 @@ export function LaneCalibrationPage() {
   const [snapshotKey, setSnapshotKey] = useState(0);
   const [proposed, setProposed] = useState<ProposedResponse | null>(null);
   const [showProposedAsRef, setShowProposedAsRef] = useState(false);
+  const [approachGeometry, setApproachGeometry] = useState<Record<string, ApproachGeometry>>({});
+  const [divideN, setDivideN] = useState<number>(3);
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const wrapRef = useRef<HTMLDivElement | null>(null);
@@ -95,6 +109,7 @@ export function LaneCalibrationPage() {
       }
       setLanes(out);
       setSelectedIdx(out.length > 0 ? 0 : null);
+      if (j.approach_geometry) setApproachGeometry(j.approach_geometry);
       setError(null);
     } catch (e) {
       setError((e as Error).message);
@@ -200,6 +215,49 @@ export function LaneCalibrationPage() {
 
   const setLaneApproach = (idx: number, approach: Approach) => {
     setLanes((cur) => cur.map((l, i) => (i === idx ? { ...l, approach } : l)));
+  };
+
+  /**
+   * Equal-divide the active approach into N perspective-correct lane strips.
+   *
+   * The approach polygon already encodes perspective via its 4 vertices (the
+   * stop_line edge is closer to the camera than the back edge in pixel
+   * space). We linearly interpolate N+1 points along each long edge and
+   * connect matched indices — strips taper naturally toward the vanishing
+   * point with zero perspective math.
+   *
+   * Replaces any existing lanes for the active approach with the divided ones.
+   */
+  const equalDivideActiveApproach = () => {
+    const geom = approachGeometry[activeApproach];
+    if (!geom || !geom.stop_line) {
+      setError(`No approach geometry for ${activeApproach}`);
+      return;
+    }
+    const n = Math.max(1, Math.min(8, divideN));
+    const strips = equalDivideApproach(
+      geom.approach_polygon,
+      geom.stop_line as [number, number][],
+      n,
+    );
+    if (strips.length === 0) {
+      setError(`Could not equal-divide ${activeApproach} (geometry too thin)`);
+      return;
+    }
+    const newLanes: EditableLane[] = strips.map((poly, i) => ({
+      approach: activeApproach,
+      lane_id: `${activeApproach}-${i + 1}`,
+      lane_idx: i,
+      lane_type: laneTypeFor(i, n),
+      polygon: poly,
+    }));
+    // Replace existing lanes for this approach; keep others intact.
+    setLanes((cur) => [
+      ...cur.filter((l) => l.approach !== activeApproach),
+      ...newLanes,
+    ]);
+    setSelectedIdx(null);
+    setError(null);
   };
 
   // ---------------- canvas event handling ----------------
@@ -347,27 +405,32 @@ export function LaneCalibrationPage() {
     <div style={{ padding: 14, color: '#e6edf3', display: 'flex', flexDirection: 'column', gap: 10 }}>
       <h1 style={{ fontSize: 22, margin: 0 }}>Lane calibration (manual)</h1>
       <p style={{ opacity: 0.7, margin: 0, fontSize: 13 }}>
-        Click on the snapshot to add polygon vertices. Drag a vertex to move it.
-        Right-click a vertex to delete it. A polygon needs ≥3 vertices to fill.
-        Use <em>Re-induce</em> to overlay the algorithm's proposal as a dashed reference,
-        then <em>Adopt proposal</em> to copy it into editable shape, or just draw your own.
+        <strong>Recommended:</strong> pick an approach below, set N (lane count),
+        click <em>Divide into N lanes</em> — strips are placed perspective-correctly
+        between the stop line and the back edge of the approach. Then refine vertices
+        as needed (click to add, drag to move, right-click to delete).
       </p>
 
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+      {/* Primary tool — equal-divide */}
+      <div style={{
+        display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center',
+        background: '#0f172a', border: '1px solid #1e293b', borderRadius: 8, padding: 10,
+      }}>
+        <span style={labelInline}>Approach</span>
         <select value={activeApproach} onChange={(e) => setActiveApproach(e.target.value as Approach)}
           style={selectStyle}>
-          {APPROACHES.map((a) => <option key={a} value={a}>Add to {a}</option>)}
+          {APPROACHES.map((a) => <option key={a} value={a}>{a}</option>)}
         </select>
-        <button onClick={addLane} disabled={!!busy} style={btn('#22c55e')}>+ New lane</button>
-        <button onClick={induceProposal} disabled={!!busy} style={btn('#a78bfa')}>
-          {busy === 'inducing' ? 'inducing…' : 'Re-induce reference'}
+        <span style={labelInline}>N&nbsp;lanes</span>
+        <input type="number" min={1} max={8} value={divideN}
+          onChange={(e) => setDivideN(Math.max(1, Math.min(8, parseInt(e.target.value) || 1)))}
+          style={{ ...selectStyle, width: 64 }} />
+        <button onClick={equalDivideActiveApproach} disabled={!!busy} style={btn('#22c55e')}>
+          Divide into {divideN} lanes
         </button>
-        <button onClick={adoptProposed} disabled={!proposed?.proposed || !!busy} style={btn('#3b82f6')}>
-          Adopt proposal
-        </button>
-        <button onClick={() => setShowProposedAsRef((v) => !v)} disabled={!proposed?.proposed}
-          style={btn('#475569')}>
-          ref: {showProposedAsRef ? 'shown' : 'hidden'}
+        <button onClick={addLane} disabled={!!busy} style={btn('#475569')}>+ Single lane</button>
+        <button onClick={saveAll} disabled={!!busy || lanes.length === 0} style={btn('#fbbf24')}>
+          {busy === 'saving' ? 'saving…' : `Save all (${lanes.length})`}
         </button>
         <button onClick={loadSaved} disabled={!!busy} style={btn('#475569')}>
           Reload saved
@@ -375,8 +438,26 @@ export function LaneCalibrationPage() {
         <button onClick={() => setSnapshotKey((k) => k + 1)} style={btn('#475569')}>
           Refresh snapshot
         </button>
-        <button onClick={saveAll} disabled={!!busy || lanes.length === 0} style={btn('#fbbf24')}>
-          {busy === 'saving' ? 'saving…' : `Save all (${lanes.length})`}
+      </div>
+
+      {/* Secondary tool — auto-induction (advisory only) */}
+      <div style={{
+        display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center',
+        background: '#0f172a', border: '1px dashed #1e293b', borderRadius: 8, padding: 8,
+        fontSize: 12,
+      }}>
+        <span style={{ opacity: 0.6 }}>
+          Auto-induction (draft only — please review):
+        </span>
+        <button onClick={induceProposal} disabled={!!busy} style={{ ...btn('#a78bfa'), padding: '4px 10px', fontSize: 12 }}>
+          {busy === 'inducing' ? 'inducing…' : 'Re-induce'}
+        </button>
+        <button onClick={adoptProposed} disabled={!proposed?.proposed || !!busy} style={{ ...btn('#3b82f6'), padding: '4px 10px', fontSize: 12 }}>
+          Adopt
+        </button>
+        <button onClick={() => setShowProposedAsRef((v) => !v)} disabled={!proposed?.proposed}
+          style={{ ...btn('#475569'), padding: '4px 10px', fontSize: 12 }}>
+          ref: {showProposedAsRef ? 'shown' : 'hidden'}
         </button>
       </div>
 
@@ -491,27 +572,6 @@ function nearestVertex(poly: number[][], fx: number, fy: number, threshold: numb
   return best;
 }
 
-function centerlineFromPolygon(poly: number[][]): number[][] {
-  // Half-perimeter centerline: walk around the polygon, take the midpoint
-  // between vertex i and vertex (n - 1 - i) — works well for "ribbon" lane
-  // polygons that look like {left edge + reversed right edge}.
-  const n = poly.length;
-  if (n < 4) {
-    // Just give a single midpoint if we can't infer left/right edges.
-    const cx = poly.reduce((a, [x]) => a + x, 0) / n;
-    const cy = poly.reduce((a, [, y]) => a + y, 0) / n;
-    return [[cx, cy]];
-  }
-  const half = Math.floor(n / 2);
-  const out: number[][] = [];
-  for (let i = 0; i < half; i++) {
-    const [x1, y1] = poly[i];
-    const [x2, y2] = poly[n - 1 - i];
-    out.push([(x1 + x2) / 2, (y1 + y2) / 2]);
-  }
-  return out;
-}
-
 const btn = (bg: string): React.CSSProperties => ({
   background: bg,
   color: '#0a0e15',
@@ -522,6 +582,14 @@ const btn = (bg: string): React.CSSProperties => ({
   cursor: 'pointer',
   fontSize: 12,
 });
+
+const labelInline: React.CSSProperties = {
+  fontSize: 11,
+  letterSpacing: 0.4,
+  color: '#94a3b8',
+  textTransform: 'uppercase',
+  fontWeight: 600,
+};
 
 const selectStyle: React.CSSProperties = {
   background: '#0f172a',

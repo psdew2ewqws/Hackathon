@@ -218,8 +218,12 @@ def fuse(
     for approach, c in approach_counts.items():
         in_zone = int(c.get("in_zone", 0))
         crossings = int(c.get("crossings_in_bin", 0))
-        in_zone_pce = float(c.get("in_zone_pce", in_zone))
-        pce_in_bin = float(c.get("crossings_pce_in_bin", crossings))
+        # Old DB rows may persist these as NULL; dict.get's default doesn't
+        # cover an explicit None, so guard each conversion.
+        _iz_pce = c.get("in_zone_pce")
+        in_zone_pce = float(_iz_pce) if _iz_pce is not None else float(in_zone)
+        _cr_pce = c.get("crossings_pce_in_bin")
+        pce_in_bin = float(_cr_pce) if _cr_pce is not None else float(crossings)
         mix = dict(c.get("mix") or {})
 
         demand_per_min = (crossings * 60.0 / max(bin_seconds, 1))

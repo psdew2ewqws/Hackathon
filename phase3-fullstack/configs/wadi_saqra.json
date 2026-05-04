@@ -6,18 +6,18 @@
   "source": {
     "kind": "rtsp",
     "url": "rtsp://127.0.0.1:8554/wadi_saqra",
-    "frame_width": 1920,
-    "frame_height": 1080,
+    "frame_width": 848,
+    "frame_height": 478,
     "source_fps": 30,
     "ingest_fps": 10
   },
   "video": {
-    "file": "phase3-fullstack/data/wadi_saqra_5210_1080p.mp4",
-    "original": "/home/admin1/Downloads/IMG_5210.MOV",
+    "file": "FixedVideo.mp4",
+    "original": "/home/admin1/traffic-intel/FixedVideo.mp4",
     "captured_at_local": "2026-04-22T09:57:35+03:00",
     "captured_at_utc": "2026-04-22T06:57:35Z",
     "intended_local_hour": 10.0,
-    "duration_seconds": 314.933,
+    "duration_seconds": 109.209,
     "ffmpeg_start_file": "phase3-fullstack/data/ffmpeg_start.txt"
   },
   "gmaps": {
@@ -36,10 +36,10 @@
       "all_red": 2
     },
     "video_anchor": {
-      "video_ts_seconds": 23.0,
-      "phase_name": "E",
+      "video_ts_seconds": 0.0,
+      "phase_name": "NS",
       "signal_state": "GREEN ON",
-      "note": "User-observed 2026-04-22: E light opens exactly at second 23 of the clip."
+      "note": "User-observed 2026-05-04 on FixedVideo.mp4: NS light opens at second 0 of the clip."
     }
   },
   "approaches": {

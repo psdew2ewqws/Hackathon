@@ -1,5 +1,6 @@
 import type {
   CountsResponse,
+  ForecastMlResponse,
   ForecastResponse,
   FusionResponse,
   GmapsResponse,
@@ -52,3 +53,6 @@ export const getHeatmap = (s?: AbortSignal) =>
 
 export const getForecast = (hour: number, s?: AbortSignal) =>
   getJSON<ForecastResponse>(`/api/forecast?hour=${hour}`, s);
+
+export const getForecastMl = (s?: AbortSignal) =>
+  getJSON<ForecastMlResponse>('/api/forecast/ml', s);

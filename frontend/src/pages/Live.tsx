@@ -22,8 +22,10 @@ import {
   type SiteConfig,
 } from '../api/types';
 import { ApproachCard } from '../components/ApproachCard';
+import { ApproachZoneEditor } from '../components/ApproachZoneEditor';
 import { DetectorBackendToggle } from '../components/DetectorBackendToggle';
 import { LaneOverlay } from '../components/LaneOverlay';
+import { LaneQuickEditor } from '../components/LaneQuickEditor';
 import { Pill } from '../components/Pill';
 import { LineChart } from '../components/charts';
 
@@ -230,6 +232,13 @@ export function LivePage() {
     return () => ac.abort();
   }, []);
 
+  // On page (re)load, restart the RTSP loop so the video begins at frame 0
+  // and the signal-cycle anchor (NS GREEN @ 0:00) aligns with what the
+  // operator is watching.
+  useEffect(() => {
+    fetch(apiUrl('/api/video/restart'), { method: 'POST' }).catch(() => {});
+  }, []);
+
   // Poll counts + fusion + recommendation each second
   useEffect(() => {
     let alive = true;
@@ -340,6 +349,8 @@ export function LivePage() {
         <section style={cardStyle}>
           <h2 style={cardTitle}>Annotated RTSP feed</h2>
           <DetectorBackendToggle />
+          <LaneQuickEditor />
+          <ApproachZoneToggleAndEditor />
           <div style={{ position: 'relative', width: '100%', maxWidth: 960 }}>
             <img
               src={apiUrl('/mjpeg')}
@@ -2540,4 +2551,33 @@ function ChartAnalysisStrip({
       })}
     </div>
   );
+}
+
+
+function ApproachZoneToggleAndEditor() {
+  const [open, setOpen] = useState(false);
+  if (!open) {
+    return (
+      <button
+        onClick={() => setOpen(true)}
+        style={{
+          background: 'transparent',
+          color: '#94a3b8',
+          border: '1px dashed #1e293b',
+          borderRadius: 8,
+          padding: '6px 12px',
+          marginBottom: 10,
+          cursor: 'pointer',
+          fontSize: 11,
+          letterSpacing: 0.4,
+          textAlign: 'left',
+          width: '100%',
+        }}
+        title="Edit the outer S/N/E/W approach polygons"
+      >
+        ✎ Edit approach zones (outer polygons) — currently hardcoded; click to redraw
+      </button>
+    );
+  }
+  return <ApproachZoneEditor onClose={() => setOpen(false)} />;
 }

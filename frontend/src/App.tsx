@@ -3,6 +3,7 @@ import { Nav } from './components/Nav';
 import { AdvisorDrawer } from './components/AdvisorDrawer';
 import { AuthProvider } from './auth/AuthContext';
 import { RequireAuth } from './auth/RequireAuth';
+import { DashboardV2 } from './pages/DashboardV2';
 import { ForecastPage } from './pages/Forecast';
 import { LivePage } from './pages/Live';
 import { SignalPage } from './pages/Signal';
@@ -40,6 +41,14 @@ export default function App() {
               element={
                 <RequireAuth minRole="viewer">
                   <LivePage />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/dashboard"
+              element={
+                <RequireAuth minRole="viewer">
+                  <DashboardV2 />
                 </RequireAuth>
               }
             />

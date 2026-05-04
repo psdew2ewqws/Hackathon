@@ -1,0 +1,1552 @@
+{
+  "site_id": "wadi_saqra",
+  "captured": "2026-04-26",
+  "schema_version": 1,
+  "source": "data/research/gmaps/typical_2026-04-26.ndjson",
+  "corridors": {
+    "N": {
+      "0.0": {
+        "congestion_ratio": 0.9294,
+        "congestion_label": "free",
+        "speed_kmh": 20.58,
+        "static_speed_kmh": 19.13,
+        "duration_s": 421.0,
+        "static_duration_s": 453.0
+      },
+      "0.5": {
+        "congestion_ratio": 0.8543,
+        "congestion_label": "free",
+        "speed_kmh": 22.39,
+        "static_speed_kmh": 19.13,
+        "duration_s": 387.0,
+        "static_duration_s": 453.0
+      },
+      "1.0": {
+        "congestion_ratio": 0.8212,
+        "congestion_label": "free",
+        "speed_kmh": 23.29,
+        "static_speed_kmh": 19.13,
+        "duration_s": 372.0,
+        "static_duration_s": 453.0
+      },
+      "1.5": {
+        "congestion_ratio": 0.8035,
+        "congestion_label": "free",
+        "speed_kmh": 23.81,
+        "static_speed_kmh": 19.13,
+        "duration_s": 364.0,
+        "static_duration_s": 453.0
+      },
+      "2.0": {
+        "congestion_ratio": 0.8742,
+        "congestion_label": "free",
+        "speed_kmh": 21.88,
+        "static_speed_kmh": 19.13,
+        "duration_s": 396.0,
+        "static_duration_s": 453.0
+      },
+      "2.5": {
+        "congestion_ratio": 0.7506,
+        "congestion_label": "free",
+        "speed_kmh": 25.49,
+        "static_speed_kmh": 19.13,
+        "duration_s": 340.0,
+        "static_duration_s": 453.0
+      },
+      "3.0": {
+        "congestion_ratio": 0.7439,
+        "congestion_label": "free",
+        "speed_kmh": 25.71,
+        "static_speed_kmh": 19.13,
+        "duration_s": 337.0,
+        "static_duration_s": 453.0
+      },
+      "3.5": {
+        "congestion_ratio": 0.7506,
+        "congestion_label": "free",
+        "speed_kmh": 25.49,
+        "static_speed_kmh": 19.13,
+        "duration_s": 340.0,
+        "static_duration_s": 453.0
+      },
+      "4.0": {
+        "congestion_ratio": 0.7704,
+        "congestion_label": "free",
+        "speed_kmh": 24.83,
+        "static_speed_kmh": 19.13,
+        "duration_s": 349.0,
+        "static_duration_s": 453.0
+      },
+      "4.5": {
+        "congestion_ratio": 0.7594,
+        "congestion_label": "free",
+        "speed_kmh": 25.19,
+        "static_speed_kmh": 19.13,
+        "duration_s": 344.0,
+        "static_duration_s": 453.0
+      },
+      "5.0": {
+        "congestion_ratio": 0.7616,
+        "congestion_label": "free",
+        "speed_kmh": 25.12,
+        "static_speed_kmh": 19.13,
+        "duration_s": 345.0,
+        "static_duration_s": 453.0
+      },
+      "5.5": {
+        "congestion_ratio": 0.7638,
+        "congestion_label": "free",
+        "speed_kmh": 25.04,
+        "static_speed_kmh": 19.13,
+        "duration_s": 346.0,
+        "static_duration_s": 453.0
+      },
+      "6.0": {
+        "congestion_ratio": 0.7638,
+        "congestion_label": "free",
+        "speed_kmh": 25.04,
+        "static_speed_kmh": 19.13,
+        "duration_s": 346.0,
+        "static_duration_s": 453.0
+      },
+      "6.5": {
+        "congestion_ratio": 0.7837,
+        "congestion_label": "free",
+        "speed_kmh": 24.41,
+        "static_speed_kmh": 19.13,
+        "duration_s": 355.0,
+        "static_duration_s": 453.0
+      },
+      "7.0": {
+        "congestion_ratio": 0.777,
+        "congestion_label": "free",
+        "speed_kmh": 24.62,
+        "static_speed_kmh": 19.13,
+        "duration_s": 352.0,
+        "static_duration_s": 453.0
+      },
+      "7.5": {
+        "congestion_ratio": 0.819,
+        "congestion_label": "free",
+        "speed_kmh": 23.36,
+        "static_speed_kmh": 19.13,
+        "duration_s": 371.0,
+        "static_duration_s": 453.0
+      },
+      "8.0": {
+        "congestion_ratio": 0.8411,
+        "congestion_label": "free",
+        "speed_kmh": 22.74,
+        "static_speed_kmh": 19.13,
+        "duration_s": 381.0,
+        "static_duration_s": 453.0
+      },
+      "8.5": {
+        "congestion_ratio": 0.8675,
+        "congestion_label": "free",
+        "speed_kmh": 22.05,
+        "static_speed_kmh": 19.13,
+        "duration_s": 393.0,
+        "static_duration_s": 453.0
+      },
+      "9.0": {
+        "congestion_ratio": 0.83,
+        "congestion_label": "free",
+        "speed_kmh": 23.05,
+        "static_speed_kmh": 19.13,
+        "duration_s": 376.0,
+        "static_duration_s": 453.0
+      },
+      "9.5": {
+        "congestion_ratio": 0.819,
+        "congestion_label": "free",
+        "speed_kmh": 23.36,
+        "static_speed_kmh": 19.13,
+        "duration_s": 371.0,
+        "static_duration_s": 453.0
+      },
+      "10.0": {
+        "congestion_ratio": 0.8234,
+        "congestion_label": "free",
+        "speed_kmh": 23.23,
+        "static_speed_kmh": 19.13,
+        "duration_s": 373.0,
+        "static_duration_s": 453.0
+      },
+      "10.5": {
+        "congestion_ratio": 0.8609,
+        "congestion_label": "free",
+        "speed_kmh": 22.22,
+        "static_speed_kmh": 19.13,
+        "duration_s": 390.0,
+        "static_duration_s": 453.0
+      },
+      "11.0": {
+        "congestion_ratio": 0.9161,
+        "congestion_label": "free",
+        "speed_kmh": 20.88,
+        "static_speed_kmh": 19.13,
+        "duration_s": 415.0,
+        "static_duration_s": 453.0
+      },
+      "11.5": {
+        "congestion_ratio": 0.9404,
+        "congestion_label": "free",
+        "speed_kmh": 20.34,
+        "static_speed_kmh": 19.13,
+        "duration_s": 426.0,
+        "static_duration_s": 453.0
+      },
+      "12.0": {
+        "congestion_ratio": 0.9316,
+        "congestion_label": "free",
+        "speed_kmh": 20.53,
+        "static_speed_kmh": 19.13,
+        "duration_s": 422.0,
+        "static_duration_s": 453.0
+      },
+      "12.5": {
+        "congestion_ratio": 0.9426,
+        "congestion_label": "free",
+        "speed_kmh": 20.29,
+        "static_speed_kmh": 19.13,
+        "duration_s": 427.0,
+        "static_duration_s": 453.0
+      },
+      "13.0": {
+        "congestion_ratio": 0.9514,
+        "congestion_label": "free",
+        "speed_kmh": 20.1,
+        "static_speed_kmh": 19.13,
+        "duration_s": 431.0,
+        "static_duration_s": 453.0
+      },
+      "13.5": {
+        "congestion_ratio": 1.0044,
+        "congestion_label": "free",
+        "speed_kmh": 19.04,
+        "static_speed_kmh": 19.13,
+        "duration_s": 455.0,
+        "static_duration_s": 453.0
+      },
+      "14.0": {
+        "congestion_ratio": 1.0044,
+        "congestion_label": "free",
+        "speed_kmh": 19.04,
+        "static_speed_kmh": 19.13,
+        "duration_s": 455.0,
+        "static_duration_s": 453.0
+      },
+      "14.5": {
+        "congestion_ratio": 1.0309,
+        "congestion_label": "free",
+        "speed_kmh": 18.56,
+        "static_speed_kmh": 19.13,
+        "duration_s": 467.0,
+        "static_duration_s": 453.0
+      },
+      "15.0": {
+        "congestion_ratio": 1.0353,
+        "congestion_label": "free",
+        "speed_kmh": 18.48,
+        "static_speed_kmh": 19.13,
+        "duration_s": 469.0,
+        "static_duration_s": 453.0
+      },
+      "15.5": {
+        "congestion_ratio": 1.0728,
+        "congestion_label": "free",
+        "speed_kmh": 17.83,
+        "static_speed_kmh": 19.13,
+        "duration_s": 486.0,
+        "static_duration_s": 453.0
+      },
+      "16.0": {
+        "congestion_ratio": 1.0706,
+        "congestion_label": "free",
+        "speed_kmh": 17.87,
+        "static_speed_kmh": 19.13,
+        "duration_s": 485.0,
+        "static_duration_s": 453.0
+      },
+      "16.5": {
+        "congestion_ratio": 1.0044,
+        "congestion_label": "free",
+        "speed_kmh": 19.04,
+        "static_speed_kmh": 19.13,
+        "duration_s": 455.0,
+        "static_duration_s": 453.0
+      },
+      "17.0": {
+        "congestion_ratio": 0.9095,
+        "congestion_label": "free",
+        "speed_kmh": 21.03,
+        "static_speed_kmh": 19.13,
+        "duration_s": 412.0,
+        "static_duration_s": 453.0
+      },
+      "17.5": {
+        "congestion_ratio": 0.9161,
+        "congestion_label": "free",
+        "speed_kmh": 20.88,
+        "static_speed_kmh": 19.13,
+        "duration_s": 415.0,
+        "static_duration_s": 453.0
+      },
+      "18.0": {
+        "congestion_ratio": 0.872,
+        "congestion_label": "free",
+        "speed_kmh": 21.94,
+        "static_speed_kmh": 19.13,
+        "duration_s": 395.0,
+        "static_duration_s": 453.0
+      },
+      "18.5": {
+        "congestion_ratio": 0.883,
+        "congestion_label": "free",
+        "speed_kmh": 21.66,
+        "static_speed_kmh": 19.13,
+        "duration_s": 400.0,
+        "static_duration_s": 453.0
+      },
+      "19.0": {
+        "congestion_ratio": 0.8653,
+        "congestion_label": "free",
+        "speed_kmh": 22.11,
+        "static_speed_kmh": 19.13,
+        "duration_s": 392.0,
+        "static_duration_s": 453.0
+      },
+      "19.5": {
+        "congestion_ratio": 0.9095,
+        "congestion_label": "free",
+        "speed_kmh": 21.03,
+        "static_speed_kmh": 19.13,
+        "duration_s": 412.0,
+        "static_duration_s": 453.0
+      },
+      "20.0": {
+        "congestion_ratio": 0.9227,
+        "congestion_label": "free",
+        "speed_kmh": 20.73,
+        "static_speed_kmh": 19.13,
+        "duration_s": 418.0,
+        "static_duration_s": 453.0
+      },
+      "20.5": {
+        "congestion_ratio": 0.9249,
+        "congestion_label": "free",
+        "speed_kmh": 20.68,
+        "static_speed_kmh": 19.13,
+        "duration_s": 419.0,
+        "static_duration_s": 453.0
+      },
+      "21.0": {
+        "congestion_ratio": 0.9757,
+        "congestion_label": "free",
+        "speed_kmh": 19.6,
+        "static_speed_kmh": 19.13,
+        "duration_s": 442.0,
+        "static_duration_s": 453.0
+      },
+      "21.5": {
+        "congestion_ratio": 1.0177,
+        "congestion_label": "free",
+        "speed_kmh": 18.8,
+        "static_speed_kmh": 19.13,
+        "duration_s": 461.0,
+        "static_duration_s": 453.0
+      },
+      "22.0": {
+        "congestion_ratio": 0.9912,
+        "congestion_label": "free",
+        "speed_kmh": 19.3,
+        "static_speed_kmh": 19.13,
+        "duration_s": 449.0,
+        "static_duration_s": 453.0
+      },
+      "22.5": {
+        "congestion_ratio": 0.9161,
+        "congestion_label": "free",
+        "speed_kmh": 20.88,
+        "static_speed_kmh": 19.13,
+        "duration_s": 415.0,
+        "static_duration_s": 453.0
+      },
+      "23.0": {
+        "congestion_ratio": 0.8742,
+        "congestion_label": "free",
+        "speed_kmh": 21.88,
+        "static_speed_kmh": 19.13,
+        "duration_s": 396.0,
+        "static_duration_s": 453.0
+      },
+      "23.5": {
+        "congestion_ratio": 0.8896,
+        "congestion_label": "free",
+        "speed_kmh": 21.5,
+        "static_speed_kmh": 19.13,
+        "duration_s": 403.0,
+        "static_duration_s": 453.0
+      }
+    },
+    "S": {
+      "0.0": null,
+      "0.5": {
+        "congestion_ratio": 0.9406,
+        "congestion_label": "free",
+        "speed_kmh": 24.61,
+        "static_speed_kmh": 23.15,
+        "duration_s": 269.0,
+        "static_duration_s": 286.0
+      },
+      "1.0": {
+        "congestion_ratio": 0.8846,
+        "congestion_label": "free",
+        "speed_kmh": 26.17,
+        "static_speed_kmh": 23.15,
+        "duration_s": 253.0,
+        "static_duration_s": 286.0
+      },
+      "1.5": {
+        "congestion_ratio": 0.9196,
+        "congestion_label": "free",
+        "speed_kmh": 25.17,
+        "static_speed_kmh": 23.15,
+        "duration_s": 263.0,
+        "static_duration_s": 286.0
+      },
+      "2.0": {
+        "congestion_ratio": 0.8916,
+        "congestion_label": "free",
+        "speed_kmh": 25.96,
+        "static_speed_kmh": 23.15,
+        "duration_s": 255.0,
+        "static_duration_s": 286.0
+      },
+      "2.5": {
+        "congestion_ratio": 0.9196,
+        "congestion_label": "free",
+        "speed_kmh": 25.17,
+        "static_speed_kmh": 23.15,
+        "duration_s": 263.0,
+        "static_duration_s": 286.0
+      },
+      "3.0": {
+        "congestion_ratio": 0.9091,
+        "congestion_label": "free",
+        "speed_kmh": 25.46,
+        "static_speed_kmh": 23.15,
+        "duration_s": 260.0,
+        "static_duration_s": 286.0
+      },
+      "3.5": null,
+      "4.0": {
+        "congestion_ratio": 0.8462,
+        "congestion_label": "free",
+        "speed_kmh": 27.36,
+        "static_speed_kmh": 23.15,
+        "duration_s": 242.0,
+        "static_duration_s": 286.0
+      },
+      "4.5": {
+        "congestion_ratio": 0.8427,
+        "congestion_label": "free",
+        "speed_kmh": 27.47,
+        "static_speed_kmh": 23.15,
+        "duration_s": 241.0,
+        "static_duration_s": 286.0
+      },
+      "5.0": {
+        "congestion_ratio": 0.8706,
+        "congestion_label": "free",
+        "speed_kmh": 26.59,
+        "static_speed_kmh": 23.15,
+        "duration_s": 249.0,
+        "static_duration_s": 286.0
+      },
+      "5.5": {
+        "congestion_ratio": 0.8252,
+        "congestion_label": "free",
+        "speed_kmh": 28.05,
+        "static_speed_kmh": 23.15,
+        "duration_s": 236.0,
+        "static_duration_s": 286.0
+      },
+      "6.0": {
+        "congestion_ratio": 0.7902,
+        "congestion_label": "free",
+        "speed_kmh": 29.29,
+        "static_speed_kmh": 23.15,
+        "duration_s": 226.0,
+        "static_duration_s": 286.0
+      },
+      "6.5": {
+        "congestion_ratio": 0.7692,
+        "congestion_label": "free",
+        "speed_kmh": 30.09,
+        "static_speed_kmh": 23.15,
+        "duration_s": 220.0,
+        "static_duration_s": 286.0
+      },
+      "7.0": {
+        "congestion_ratio": 0.7413,
+        "congestion_label": "free",
+        "speed_kmh": 31.23,
+        "static_speed_kmh": 23.15,
+        "duration_s": 212.0,
+        "static_duration_s": 286.0
+      },
+      "7.5": {
+        "congestion_ratio": 0.7413,
+        "congestion_label": "free",
+        "speed_kmh": 31.23,
+        "static_speed_kmh": 23.15,
+        "duration_s": 212.0,
+        "static_duration_s": 286.0
+      },
+      "8.0": {
+        "congestion_ratio": 0.7797,
+        "congestion_label": "free",
+        "speed_kmh": 29.69,
+        "static_speed_kmh": 23.15,
+        "duration_s": 223.0,
+        "static_duration_s": 286.0
+      },
+      "8.5": {
+        "congestion_ratio": 0.8042,
+        "congestion_label": "free",
+        "speed_kmh": 28.78,
+        "static_speed_kmh": 23.15,
+        "duration_s": 230.0,
+        "static_duration_s": 286.0
+      },
+      "9.0": {
+        "congestion_ratio": 0.8322,
+        "congestion_label": "free",
+        "speed_kmh": 27.82,
+        "static_speed_kmh": 23.15,
+        "duration_s": 238.0,
+        "static_duration_s": 286.0
+      },
+      "9.5": {
+        "congestion_ratio": 0.8252,
+        "congestion_label": "free",
+        "speed_kmh": 28.05,
+        "static_speed_kmh": 23.15,
+        "duration_s": 236.0,
+        "static_duration_s": 286.0
+      },
+      "10.0": {
+        "congestion_ratio": 0.8741,
+        "congestion_label": "free",
+        "speed_kmh": 26.48,
+        "static_speed_kmh": 23.15,
+        "duration_s": 250.0,
+        "static_duration_s": 286.0
+      },
+      "10.5": {
+        "congestion_ratio": 0.8881,
+        "congestion_label": "free",
+        "speed_kmh": 26.06,
+        "static_speed_kmh": 23.15,
+        "duration_s": 254.0,
+        "static_duration_s": 286.0
+      },
+      "11.0": {
+        "congestion_ratio": 0.9126,
+        "congestion_label": "free",
+        "speed_kmh": 25.37,
+        "static_speed_kmh": 23.15,
+        "duration_s": 261.0,
+        "static_duration_s": 286.0
+      },
+      "11.5": {
+        "congestion_ratio": 0.9056,
+        "congestion_label": "free",
+        "speed_kmh": 25.56,
+        "static_speed_kmh": 23.15,
+        "duration_s": 259.0,
+        "static_duration_s": 286.0
+      },
+      "12.0": {
+        "congestion_ratio": 0.9231,
+        "congestion_label": "free",
+        "speed_kmh": 25.08,
+        "static_speed_kmh": 23.15,
+        "duration_s": 264.0,
+        "static_duration_s": 286.0
+      },
+      "12.5": {
+        "congestion_ratio": 0.9406,
+        "congestion_label": "free",
+        "speed_kmh": 24.61,
+        "static_speed_kmh": 23.15,
+        "duration_s": 269.0,
+        "static_duration_s": 286.0
+      },
+      "13.0": {
+        "congestion_ratio": 0.9476,
+        "congestion_label": "free",
+        "speed_kmh": 24.43,
+        "static_speed_kmh": 23.15,
+        "duration_s": 271.0,
+        "static_duration_s": 286.0
+      },
+      "13.5": {
+        "congestion_ratio": 0.9476,
+        "congestion_label": "free",
+        "speed_kmh": 24.43,
+        "static_speed_kmh": 23.15,
+        "duration_s": 271.0,
+        "static_duration_s": 286.0
+      },
+      "14.0": {
+        "congestion_ratio": 0.986,
+        "congestion_label": "free",
+        "speed_kmh": 23.48,
+        "static_speed_kmh": 23.15,
+        "duration_s": 282.0,
+        "static_duration_s": 286.0
+      },
+      "14.5": {
+        "congestion_ratio": 1.014,
+        "congestion_label": "free",
+        "speed_kmh": 22.83,
+        "static_speed_kmh": 23.15,
+        "duration_s": 290.0,
+        "static_duration_s": 286.0
+      },
+      "15.0": {
+        "congestion_ratio": 1.0455,
+        "congestion_label": "free",
+        "speed_kmh": 22.14,
+        "static_speed_kmh": 23.15,
+        "duration_s": 299.0,
+        "static_duration_s": 286.0
+      },
+      "15.5": {
+        "congestion_ratio": 1.1888,
+        "congestion_label": "light",
+        "speed_kmh": 19.47,
+        "static_speed_kmh": 23.15,
+        "duration_s": 340.0,
+        "static_duration_s": 286.0
+      },
+      "16.0": {
+        "congestion_ratio": 1.2203,
+        "congestion_label": "light",
+        "speed_kmh": 18.97,
+        "static_speed_kmh": 23.15,
+        "duration_s": 349.0,
+        "static_duration_s": 286.0
+      },
+      "16.5": {
+        "congestion_ratio": 1.0979,
+        "congestion_label": "free",
+        "speed_kmh": 21.08,
+        "static_speed_kmh": 23.15,
+        "duration_s": 314.0,
+        "static_duration_s": 286.0
+      },
+      "17.0": {
+        "congestion_ratio": 1.007,
+        "congestion_label": "free",
+        "speed_kmh": 22.99,
+        "static_speed_kmh": 23.15,
+        "duration_s": 288.0,
+        "static_duration_s": 286.0
+      },
+      "17.5": {
+        "congestion_ratio": 0.958,
+        "congestion_label": "free",
+        "speed_kmh": 24.16,
+        "static_speed_kmh": 23.15,
+        "duration_s": 274.0,
+        "static_duration_s": 286.0
+      },
+      "18.0": {
+        "congestion_ratio": 0.9336,
+        "congestion_label": "free",
+        "speed_kmh": 24.8,
+        "static_speed_kmh": 23.15,
+        "duration_s": 267.0,
+        "static_duration_s": 286.0
+      },
+      "18.5": {
+        "congestion_ratio": 0.9336,
+        "congestion_label": "free",
+        "speed_kmh": 24.8,
+        "static_speed_kmh": 23.15,
+        "duration_s": 267.0,
+        "static_duration_s": 286.0
+      },
+      "19.0": {
+        "congestion_ratio": 0.8916,
+        "congestion_label": "free",
+        "speed_kmh": 25.96,
+        "static_speed_kmh": 23.15,
+        "duration_s": 255.0,
+        "static_duration_s": 286.0
+      },
+      "19.5": {
+        "congestion_ratio": 0.9231,
+        "congestion_label": "free",
+        "speed_kmh": 25.08,
+        "static_speed_kmh": 23.15,
+        "duration_s": 264.0,
+        "static_duration_s": 286.0
+      },
+      "20.0": {
+        "congestion_ratio": 0.9406,
+        "congestion_label": "free",
+        "speed_kmh": 24.61,
+        "static_speed_kmh": 23.15,
+        "duration_s": 269.0,
+        "static_duration_s": 286.0
+      },
+      "20.5": {
+        "congestion_ratio": 0.9476,
+        "congestion_label": "free",
+        "speed_kmh": 24.43,
+        "static_speed_kmh": 23.15,
+        "duration_s": 271.0,
+        "static_duration_s": 286.0
+      },
+      "21.0": {
+        "congestion_ratio": 0.9755,
+        "congestion_label": "free",
+        "speed_kmh": 23.73,
+        "static_speed_kmh": 23.15,
+        "duration_s": 279.0,
+        "static_duration_s": 286.0
+      },
+      "21.5": {
+        "congestion_ratio": 1.0455,
+        "congestion_label": "free",
+        "speed_kmh": 22.14,
+        "static_speed_kmh": 23.15,
+        "duration_s": 299.0,
+        "static_duration_s": 286.0
+      },
+      "22.0": {
+        "congestion_ratio": 1.049,
+        "congestion_label": "free",
+        "speed_kmh": 22.07,
+        "static_speed_kmh": 23.15,
+        "duration_s": 300.0,
+        "static_duration_s": 286.0
+      },
+      "22.5": {
+        "congestion_ratio": 1.0,
+        "congestion_label": "free",
+        "speed_kmh": 23.15,
+        "static_speed_kmh": 23.15,
+        "duration_s": 286.0,
+        "static_duration_s": 286.0
+      },
+      "23.0": {
+        "congestion_ratio": 0.9406,
+        "congestion_label": "free",
+        "speed_kmh": 24.61,
+        "static_speed_kmh": 23.15,
+        "duration_s": 269.0,
+        "static_duration_s": 286.0
+      },
+      "23.5": {
+        "congestion_ratio": 1.0455,
+        "congestion_label": "free",
+        "speed_kmh": 22.14,
+        "static_speed_kmh": 23.15,
+        "duration_s": 299.0,
+        "static_duration_s": 286.0
+      }
+    },
+    "E": {
+      "0.0": {
+        "congestion_ratio": 0.9091,
+        "congestion_label": "free",
+        "speed_kmh": 22.59,
+        "static_speed_kmh": 20.54,
+        "duration_s": 40.0,
+        "static_duration_s": 44.0
+      },
+      "0.5": {
+        "congestion_ratio": 0.8864,
+        "congestion_label": "free",
+        "speed_kmh": 23.17,
+        "static_speed_kmh": 20.54,
+        "duration_s": 39.0,
+        "static_duration_s": 44.0
+      },
+      "1.0": {
+        "congestion_ratio": 0.8409,
+        "congestion_label": "free",
+        "speed_kmh": 24.42,
+        "static_speed_kmh": 20.54,
+        "duration_s": 37.0,
+        "static_duration_s": 44.0
+      },
+      "1.5": {
+        "congestion_ratio": 0.8182,
+        "congestion_label": "free",
+        "speed_kmh": 25.1,
+        "static_speed_kmh": 20.54,
+        "duration_s": 36.0,
+        "static_duration_s": 44.0
+      },
+      "2.0": {
+        "congestion_ratio": 0.8409,
+        "congestion_label": "free",
+        "speed_kmh": 24.42,
+        "static_speed_kmh": 20.54,
+        "duration_s": 37.0,
+        "static_duration_s": 44.0
+      },
+      "2.5": {
+        "congestion_ratio": 0.8409,
+        "congestion_label": "free",
+        "speed_kmh": 24.42,
+        "static_speed_kmh": 20.54,
+        "duration_s": 37.0,
+        "static_duration_s": 44.0
+      },
+      "3.0": {
+        "congestion_ratio": 0.8409,
+        "congestion_label": "free",
+        "speed_kmh": 24.42,
+        "static_speed_kmh": 20.54,
+        "duration_s": 37.0,
+        "static_duration_s": 44.0
+      },
+      "3.5": {
+        "congestion_ratio": 0.7955,
+        "congestion_label": "free",
+        "speed_kmh": 25.82,
+        "static_speed_kmh": 20.54,
+        "duration_s": 35.0,
+        "static_duration_s": 44.0
+      },
+      "4.0": {
+        "congestion_ratio": 0.75,
+        "congestion_label": "free",
+        "speed_kmh": 27.38,
+        "static_speed_kmh": 20.54,
+        "duration_s": 33.0,
+        "static_duration_s": 44.0
+      },
+      "4.5": {
+        "congestion_ratio": 0.7955,
+        "congestion_label": "free",
+        "speed_kmh": 25.82,
+        "static_speed_kmh": 20.54,
+        "duration_s": 35.0,
+        "static_duration_s": 44.0
+      },
+      "5.0": {
+        "congestion_ratio": 0.8409,
+        "congestion_label": "free",
+        "speed_kmh": 24.42,
+        "static_speed_kmh": 20.54,
+        "duration_s": 37.0,
+        "static_duration_s": 44.0
+      },
+      "5.5": {
+        "congestion_ratio": 0.8409,
+        "congestion_label": "free",
+        "speed_kmh": 24.42,
+        "static_speed_kmh": 20.54,
+        "duration_s": 37.0,
+        "static_duration_s": 44.0
+      },
+      "6.0": {
+        "congestion_ratio": 0.7955,
+        "congestion_label": "free",
+        "speed_kmh": 25.82,
+        "static_speed_kmh": 20.54,
+        "duration_s": 35.0,
+        "static_duration_s": 44.0
+      },
+      "6.5": {
+        "congestion_ratio": 0.7955,
+        "congestion_label": "free",
+        "speed_kmh": 25.82,
+        "static_speed_kmh": 20.54,
+        "duration_s": 35.0,
+        "static_duration_s": 44.0
+      },
+      "7.0": {
+        "congestion_ratio": 0.8409,
+        "congestion_label": "free",
+        "speed_kmh": 24.42,
+        "static_speed_kmh": 20.54,
+        "duration_s": 37.0,
+        "static_duration_s": 44.0
+      },
+      "7.5": {
+        "congestion_ratio": 0.8636,
+        "congestion_label": "free",
+        "speed_kmh": 23.78,
+        "static_speed_kmh": 20.54,
+        "duration_s": 38.0,
+        "static_duration_s": 44.0
+      },
+      "8.0": {
+        "congestion_ratio": 0.9091,
+        "congestion_label": "free",
+        "speed_kmh": 22.59,
+        "static_speed_kmh": 20.54,
+        "duration_s": 40.0,
+        "static_duration_s": 44.0
+      },
+      "8.5": {
+        "congestion_ratio": 0.9318,
+        "congestion_label": "free",
+        "speed_kmh": 22.04,
+        "static_speed_kmh": 20.54,
+        "duration_s": 41.0,
+        "static_duration_s": 44.0
+      },
+      "9.0": {
+        "congestion_ratio": 0.9318,
+        "congestion_label": "free",
+        "speed_kmh": 22.04,
+        "static_speed_kmh": 20.54,
+        "duration_s": 41.0,
+        "static_duration_s": 44.0
+      },
+      "9.5": {
+        "congestion_ratio": 0.9773,
+        "congestion_label": "free",
+        "speed_kmh": 21.01,
+        "static_speed_kmh": 20.54,
+        "duration_s": 43.0,
+        "static_duration_s": 44.0
+      },
+      "10.0": {
+        "congestion_ratio": 0.9545,
+        "congestion_label": "free",
+        "speed_kmh": 21.51,
+        "static_speed_kmh": 20.54,
+        "duration_s": 42.0,
+        "static_duration_s": 44.0
+      },
+      "10.5": {
+        "congestion_ratio": 0.9773,
+        "congestion_label": "free",
+        "speed_kmh": 21.01,
+        "static_speed_kmh": 20.54,
+        "duration_s": 43.0,
+        "static_duration_s": 44.0
+      },
+      "11.0": {
+        "congestion_ratio": 1.0455,
+        "congestion_label": "free",
+        "speed_kmh": 19.64,
+        "static_speed_kmh": 20.54,
+        "duration_s": 46.0,
+        "static_duration_s": 44.0
+      },
+      "11.5": {
+        "congestion_ratio": 1.1136,
+        "congestion_label": "free",
+        "speed_kmh": 18.44,
+        "static_speed_kmh": 20.54,
+        "duration_s": 49.0,
+        "static_duration_s": 44.0
+      },
+      "12.0": {
+        "congestion_ratio": 1.1364,
+        "congestion_label": "free",
+        "speed_kmh": 18.07,
+        "static_speed_kmh": 20.54,
+        "duration_s": 50.0,
+        "static_duration_s": 44.0
+      },
+      "12.5": {
+        "congestion_ratio": 1.1364,
+        "congestion_label": "free",
+        "speed_kmh": 18.07,
+        "static_speed_kmh": 20.54,
+        "duration_s": 50.0,
+        "static_duration_s": 44.0
+      },
+      "13.0": {
+        "congestion_ratio": 1.1591,
+        "congestion_label": "light",
+        "speed_kmh": 17.72,
+        "static_speed_kmh": 20.54,
+        "duration_s": 51.0,
+        "static_duration_s": 44.0
+      },
+      "13.5": {
+        "congestion_ratio": 1.2273,
+        "congestion_label": "light",
+        "speed_kmh": 16.73,
+        "static_speed_kmh": 20.54,
+        "duration_s": 54.0,
+        "static_duration_s": 44.0
+      },
+      "14.0": {
+        "congestion_ratio": 1.3182,
+        "congestion_label": "light",
+        "speed_kmh": 15.58,
+        "static_speed_kmh": 20.54,
+        "duration_s": 58.0,
+        "static_duration_s": 44.0
+      },
+      "14.5": {
+        "congestion_ratio": 2.0227,
+        "congestion_label": "heavy",
+        "speed_kmh": 10.15,
+        "static_speed_kmh": 20.54,
+        "duration_s": 89.0,
+        "static_duration_s": 44.0
+      },
+      "15.0": {
+        "congestion_ratio": 2.4318,
+        "congestion_label": "jam",
+        "speed_kmh": 8.44,
+        "static_speed_kmh": 20.54,
+        "duration_s": 107.0,
+        "static_duration_s": 44.0
+      },
+      "15.5": {
+        "congestion_ratio": 2.2273,
+        "congestion_label": "heavy",
+        "speed_kmh": 9.22,
+        "static_speed_kmh": 20.54,
+        "duration_s": 98.0,
+        "static_duration_s": 44.0
+      },
+      "16.0": {
+        "congestion_ratio": 2.0682,
+        "congestion_label": "heavy",
+        "speed_kmh": 9.93,
+        "static_speed_kmh": 20.54,
+        "duration_s": 91.0,
+        "static_duration_s": 44.0
+      },
+      "16.5": {
+        "congestion_ratio": 2.1364,
+        "congestion_label": "heavy",
+        "speed_kmh": 9.61,
+        "static_speed_kmh": 20.54,
+        "duration_s": 94.0,
+        "static_duration_s": 44.0
+      },
+      "17.0": {
+        "congestion_ratio": 1.8182,
+        "congestion_label": "heavy",
+        "speed_kmh": 11.3,
+        "static_speed_kmh": 20.54,
+        "duration_s": 80.0,
+        "static_duration_s": 44.0
+      },
+      "17.5": {
+        "congestion_ratio": 1.7273,
+        "congestion_label": "moderate",
+        "speed_kmh": 11.89,
+        "static_speed_kmh": 20.54,
+        "duration_s": 76.0,
+        "static_duration_s": 44.0
+      },
+      "18.0": {
+        "congestion_ratio": 1.5,
+        "congestion_label": "moderate",
+        "speed_kmh": 13.69,
+        "static_speed_kmh": 20.54,
+        "duration_s": 66.0,
+        "static_duration_s": 44.0
+      },
+      "18.5": {
+        "congestion_ratio": 1.4091,
+        "congestion_label": "moderate",
+        "speed_kmh": 14.57,
+        "static_speed_kmh": 20.54,
+        "duration_s": 62.0,
+        "static_duration_s": 44.0
+      },
+      "19.0": {
+        "congestion_ratio": 1.1136,
+        "congestion_label": "free",
+        "speed_kmh": 18.44,
+        "static_speed_kmh": 20.54,
+        "duration_s": 49.0,
+        "static_duration_s": 44.0
+      },
+      "19.5": {
+        "congestion_ratio": 0.9773,
+        "congestion_label": "free",
+        "speed_kmh": 21.01,
+        "static_speed_kmh": 20.54,
+        "duration_s": 43.0,
+        "static_duration_s": 44.0
+      },
+      "20.0": {
+        "congestion_ratio": 0.9318,
+        "congestion_label": "free",
+        "speed_kmh": 22.04,
+        "static_speed_kmh": 20.54,
+        "duration_s": 41.0,
+        "static_duration_s": 44.0
+      },
+      "20.5": {
+        "congestion_ratio": 0.9318,
+        "congestion_label": "free",
+        "speed_kmh": 22.04,
+        "static_speed_kmh": 20.54,
+        "duration_s": 41.0,
+        "static_duration_s": 44.0
+      },
+      "21.0": {
+        "congestion_ratio": 0.9545,
+        "congestion_label": "free",
+        "speed_kmh": 21.51,
+        "static_speed_kmh": 20.54,
+        "duration_s": 42.0,
+        "static_duration_s": 44.0
+      },
+      "21.5": {
+        "congestion_ratio": 0.9545,
+        "congestion_label": "free",
+        "speed_kmh": 21.51,
+        "static_speed_kmh": 20.54,
+        "duration_s": 42.0,
+        "static_duration_s": 44.0
+      },
+      "22.0": {
+        "congestion_ratio": 0.9545,
+        "congestion_label": "free",
+        "speed_kmh": 21.51,
+        "static_speed_kmh": 20.54,
+        "duration_s": 42.0,
+        "static_duration_s": 44.0
+      },
+      "22.5": {
+        "congestion_ratio": 0.9318,
+        "congestion_label": "free",
+        "speed_kmh": 22.04,
+        "static_speed_kmh": 20.54,
+        "duration_s": 41.0,
+        "static_duration_s": 44.0
+      },
+      "23.0": {
+        "congestion_ratio": 0.9091,
+        "congestion_label": "free",
+        "speed_kmh": 22.59,
+        "static_speed_kmh": 20.54,
+        "duration_s": 40.0,
+        "static_duration_s": 44.0
+      },
+      "23.5": {
+        "congestion_ratio": 0.8864,
+        "congestion_label": "free",
+        "speed_kmh": 23.17,
+        "static_speed_kmh": 20.54,
+        "duration_s": 39.0,
+        "static_duration_s": 44.0
+      }
+    },
+    "W": {
+      "0.0": {
+        "congestion_ratio": 0.9617,
+        "congestion_label": "free",
+        "speed_kmh": 23.46,
+        "static_speed_kmh": 22.56,
+        "duration_s": 377.0,
+        "static_duration_s": 392.0
+      },
+      "0.5": {
+        "congestion_ratio": 0.9643,
+        "congestion_label": "free",
+        "speed_kmh": 23.4,
+        "static_speed_kmh": 22.56,
+        "duration_s": 378.0,
+        "static_duration_s": 392.0
+      },
+      "1.0": {
+        "congestion_ratio": 0.9541,
+        "congestion_label": "free",
+        "speed_kmh": 23.65,
+        "static_speed_kmh": 22.56,
+        "duration_s": 374.0,
+        "static_duration_s": 392.0
+      },
+      "1.5": {
+        "congestion_ratio": 0.9796,
+        "congestion_label": "free",
+        "speed_kmh": 23.03,
+        "static_speed_kmh": 22.56,
+        "duration_s": 384.0,
+        "static_duration_s": 392.0
+      },
+      "2.0": {
+        "congestion_ratio": 0.9031,
+        "congestion_label": "free",
+        "speed_kmh": 24.99,
+        "static_speed_kmh": 22.56,
+        "duration_s": 354.0,
+        "static_duration_s": 392.0
+      },
+      "2.5": {
+        "congestion_ratio": 0.9898,
+        "congestion_label": "free",
+        "speed_kmh": 22.8,
+        "static_speed_kmh": 22.56,
+        "duration_s": 388.0,
+        "static_duration_s": 392.0
+      },
+      "3.0": {
+        "congestion_ratio": 0.977,
+        "congestion_label": "free",
+        "speed_kmh": 23.09,
+        "static_speed_kmh": 22.56,
+        "duration_s": 383.0,
+        "static_duration_s": 392.0
+      },
+      "3.5": {
+        "congestion_ratio": 0.8648,
+        "congestion_label": "free",
+        "speed_kmh": 26.09,
+        "static_speed_kmh": 22.56,
+        "duration_s": 339.0,
+        "static_duration_s": 392.0
+      },
+      "4.0": {
+        "congestion_ratio": 0.8648,
+        "congestion_label": "free",
+        "speed_kmh": 26.09,
+        "static_speed_kmh": 22.56,
+        "duration_s": 339.0,
+        "static_duration_s": 392.0
+      },
+      "4.5": {
+        "congestion_ratio": 0.8571,
+        "congestion_label": "free",
+        "speed_kmh": 26.32,
+        "static_speed_kmh": 22.56,
+        "duration_s": 336.0,
+        "static_duration_s": 392.0
+      },
+      "5.0": {
+        "congestion_ratio": 0.8546,
+        "congestion_label": "free",
+        "speed_kmh": 26.4,
+        "static_speed_kmh": 22.56,
+        "duration_s": 335.0,
+        "static_duration_s": 392.0
+      },
+      "5.5": {
+        "congestion_ratio": 0.8444,
+        "congestion_label": "free",
+        "speed_kmh": 26.72,
+        "static_speed_kmh": 22.56,
+        "duration_s": 331.0,
+        "static_duration_s": 392.0
+      },
+      "6.0": {
+        "congestion_ratio": 0.7959,
+        "congestion_label": "free",
+        "speed_kmh": 28.35,
+        "static_speed_kmh": 22.56,
+        "duration_s": 312.0,
+        "static_duration_s": 392.0
+      },
+      "6.5": {
+        "congestion_ratio": 0.7551,
+        "congestion_label": "free",
+        "speed_kmh": 29.88,
+        "static_speed_kmh": 22.56,
+        "duration_s": 296.0,
+        "static_duration_s": 392.0
+      },
+      "7.0": {
+        "congestion_ratio": 0.7219,
+        "congestion_label": "free",
+        "speed_kmh": 31.26,
+        "static_speed_kmh": 22.56,
+        "duration_s": 283.0,
+        "static_duration_s": 392.0
+      },
+      "7.5": {
+        "congestion_ratio": 0.7474,
+        "congestion_label": "free",
+        "speed_kmh": 30.19,
+        "static_speed_kmh": 22.56,
+        "duration_s": 293.0,
+        "static_duration_s": 392.0
+      },
+      "8.0": {
+        "congestion_ratio": 0.8163,
+        "congestion_label": "free",
+        "speed_kmh": 27.64,
+        "static_speed_kmh": 22.56,
+        "duration_s": 320.0,
+        "static_duration_s": 392.0
+      },
+      "8.5": {
+        "congestion_ratio": 0.7806,
+        "congestion_label": "free",
+        "speed_kmh": 28.91,
+        "static_speed_kmh": 22.56,
+        "duration_s": 306.0,
+        "static_duration_s": 392.0
+      },
+      "9.0": {
+        "congestion_ratio": 0.8163,
+        "congestion_label": "free",
+        "speed_kmh": 27.64,
+        "static_speed_kmh": 22.56,
+        "duration_s": 320.0,
+        "static_duration_s": 392.0
+      },
+      "9.5": {
+        "congestion_ratio": 0.8316,
+        "congestion_label": "free",
+        "speed_kmh": 27.13,
+        "static_speed_kmh": 22.56,
+        "duration_s": 326.0,
+        "static_duration_s": 392.0
+      },
+      "10.0": {
+        "congestion_ratio": 0.8495,
+        "congestion_label": "free",
+        "speed_kmh": 26.56,
+        "static_speed_kmh": 22.56,
+        "duration_s": 333.0,
+        "static_duration_s": 392.0
+      },
+      "10.5": {
+        "congestion_ratio": 0.8673,
+        "congestion_label": "free",
+        "speed_kmh": 26.02,
+        "static_speed_kmh": 22.56,
+        "duration_s": 340.0,
+        "static_duration_s": 392.0
+      },
+      "11.0": {
+        "congestion_ratio": 0.875,
+        "congestion_label": "free",
+        "speed_kmh": 25.79,
+        "static_speed_kmh": 22.56,
+        "duration_s": 343.0,
+        "static_duration_s": 392.0
+      },
+      "11.5": {
+        "congestion_ratio": 0.8929,
+        "congestion_label": "free",
+        "speed_kmh": 25.27,
+        "static_speed_kmh": 22.56,
+        "duration_s": 350.0,
+        "static_duration_s": 392.0
+      },
+      "12.0": {
+        "congestion_ratio": 0.8954,
+        "congestion_label": "free",
+        "speed_kmh": 25.2,
+        "static_speed_kmh": 22.56,
+        "duration_s": 351.0,
+        "static_duration_s": 392.0
+      },
+      "12.5": {
+        "congestion_ratio": 0.926,
+        "congestion_label": "free",
+        "speed_kmh": 24.37,
+        "static_speed_kmh": 22.56,
+        "duration_s": 363.0,
+        "static_duration_s": 392.0
+      },
+      "13.0": {
+        "congestion_ratio": 0.926,
+        "congestion_label": "free",
+        "speed_kmh": 24.37,
+        "static_speed_kmh": 22.56,
+        "duration_s": 363.0,
+        "static_duration_s": 392.0
+      },
+      "13.5": {
+        "congestion_ratio": 0.9439,
+        "congestion_label": "free",
+        "speed_kmh": 23.91,
+        "static_speed_kmh": 22.56,
+        "duration_s": 370.0,
+        "static_duration_s": 392.0
+      },
+      "14.0": {
+        "congestion_ratio": 0.9719,
+        "congestion_label": "free",
+        "speed_kmh": 23.22,
+        "static_speed_kmh": 22.56,
+        "duration_s": 381.0,
+        "static_duration_s": 392.0
+      },
+      "14.5": {
+        "congestion_ratio": 1.0255,
+        "congestion_label": "free",
+        "speed_kmh": 22.0,
+        "static_speed_kmh": 22.56,
+        "duration_s": 402.0,
+        "static_duration_s": 392.0
+      },
+      "15.0": {
+        "congestion_ratio": 1.074,
+        "congestion_label": "free",
+        "speed_kmh": 21.01,
+        "static_speed_kmh": 22.56,
+        "duration_s": 421.0,
+        "static_duration_s": 392.0
+      },
+      "15.5": {
+        "congestion_ratio": 1.199,
+        "congestion_label": "light",
+        "speed_kmh": 18.82,
+        "static_speed_kmh": 22.56,
+        "duration_s": 470.0,
+        "static_duration_s": 392.0
+      },
+      "16.0": {
+        "congestion_ratio": 1.227,
+        "congestion_label": "light",
+        "speed_kmh": 18.39,
+        "static_speed_kmh": 22.56,
+        "duration_s": 481.0,
+        "static_duration_s": 392.0
+      },
+      "16.5": {
+        "congestion_ratio": 1.1122,
+        "congestion_label": "free",
+        "speed_kmh": 20.29,
+        "static_speed_kmh": 22.56,
+        "duration_s": 436.0,
+        "static_duration_s": 392.0
+      },
+      "17.0": {
+        "congestion_ratio": 1.0434,
+        "congestion_label": "free",
+        "speed_kmh": 21.63,
+        "static_speed_kmh": 22.56,
+        "duration_s": 409.0,
+        "static_duration_s": 392.0
+      },
+      "17.5": {
+        "congestion_ratio": 1.0,
+        "congestion_label": "free",
+        "speed_kmh": 22.56,
+        "static_speed_kmh": 22.56,
+        "duration_s": 392.0,
+        "static_duration_s": 392.0
+      },
+      "18.0": {
+        "congestion_ratio": 0.9694,
+        "congestion_label": "free",
+        "speed_kmh": 23.28,
+        "static_speed_kmh": 22.56,
+        "duration_s": 380.0,
+        "static_duration_s": 392.0
+      },
+      "18.5": {
+        "congestion_ratio": 0.9592,
+        "congestion_label": "free",
+        "speed_kmh": 23.52,
+        "static_speed_kmh": 22.56,
+        "duration_s": 376.0,
+        "static_duration_s": 392.0
+      },
+      "19.0": {
+        "congestion_ratio": 0.9337,
+        "congestion_label": "free",
+        "speed_kmh": 24.17,
+        "static_speed_kmh": 22.56,
+        "duration_s": 366.0,
+        "static_duration_s": 392.0
+      },
+      "19.5": {
+        "congestion_ratio": 0.9311,
+        "congestion_label": "free",
+        "speed_kmh": 24.23,
+        "static_speed_kmh": 22.56,
+        "duration_s": 365.0,
+        "static_duration_s": 392.0
+      },
+      "20.0": {
+        "congestion_ratio": 0.9745,
+        "congestion_label": "free",
+        "speed_kmh": 23.15,
+        "static_speed_kmh": 22.56,
+        "duration_s": 382.0,
+        "static_duration_s": 392.0
+      },
+      "20.5": {
+        "congestion_ratio": 0.9592,
+        "congestion_label": "free",
+        "speed_kmh": 23.52,
+        "static_speed_kmh": 22.56,
+        "duration_s": 376.0,
+        "static_duration_s": 392.0
+      },
+      "21.0": {
+        "congestion_ratio": 1.0077,
+        "congestion_label": "free",
+        "speed_kmh": 22.39,
+        "static_speed_kmh": 22.56,
+        "duration_s": 395.0,
+        "static_duration_s": 392.0
+      },
+      "21.5": {
+        "congestion_ratio": 1.023,
+        "congestion_label": "free",
+        "speed_kmh": 22.06,
+        "static_speed_kmh": 22.56,
+        "duration_s": 401.0,
+        "static_duration_s": 392.0
+      },
+      "22.0": {
+        "congestion_ratio": 1.0587,
+        "congestion_label": "free",
+        "speed_kmh": 21.31,
+        "static_speed_kmh": 22.56,
+        "duration_s": 415.0,
+        "static_duration_s": 392.0
+      },
+      "22.5": {
+        "congestion_ratio": 1.0587,
+        "congestion_label": "free",
+        "speed_kmh": 21.31,
+        "static_speed_kmh": 22.56,
+        "duration_s": 415.0,
+        "static_duration_s": 392.0
+      },
+      "23.0": {
+        "congestion_ratio": 1.0153,
+        "congestion_label": "free",
+        "speed_kmh": 22.22,
+        "static_speed_kmh": 22.56,
+        "duration_s": 398.0,
+        "static_duration_s": 392.0
+      },
+      "23.5": {
+        "congestion_ratio": 1.0434,
+        "congestion_label": "free",
+        "speed_kmh": 21.63,
+        "static_speed_kmh": 22.56,
+        "duration_s": 409.0,
+        "static_duration_s": 392.0
+      }
+    }
+  },
+  "summary": {
+    "peak_hour_per_corridor": {
+      "N": 15.5,
+      "S": 16.0,
+      "E": 15.0,
+      "W": 16.0
+    },
+    "daily_avg_congestion_ratio": {
+      "N": 0.8863,
+      "S": 0.9264,
+      "E": 1.125,
+      "W": 0.9384
+    }
+  }
+}

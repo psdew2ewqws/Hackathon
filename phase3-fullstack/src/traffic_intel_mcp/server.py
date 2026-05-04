@@ -36,6 +36,7 @@ LOG = logging.getLogger("traffic_intel_mcp")
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 DEFAULT_DB_PATH = REPO_ROOT / "phase3-fullstack" / "data" / "traffic_intel.db"
+DEFAULT_TYPICAL_DAY_JSON = REPO_ROOT / "data" / "research" / "gmaps" / "typical_2026-04-26.json"
 
 
 # ---------------------------------------------------------------------------
@@ -125,10 +126,15 @@ def _db_signal_plan() -> dict[str, Any]:
 # ---------------------------------------------------------------------------
 
 
-def build_context(db_path: Path | None = None, site_id: str = "wadi_saqra") -> LLMContext:
+def build_context(
+    db_path: Path | None = None,
+    site_id: str = "wadi_saqra",
+    typical_day_json: Path | None = None,
+) -> LLMContext:
     """Build a DB-backed LLMContext for use by an out-of-process MCP server."""
     db_path = Path(db_path or DEFAULT_DB_PATH)
     db = get_db(db_path)
+    typical = Path(typical_day_json or DEFAULT_TYPICAL_DAY_JSON)
     return LLMContext(
         db=db,
         db_path=db_path,
@@ -137,6 +143,7 @@ def build_context(db_path: Path | None = None, site_id: str = "wadi_saqra") -> L
         forecast=_db_forecast,
         recommendation=_db_recommendation,
         signal_plan=_db_signal_plan,
+        typical_day_json=typical if typical.exists() else None,
     )
 
 

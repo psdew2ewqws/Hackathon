@@ -10,6 +10,7 @@ interface NavItem {
 
 const NAV_ITEMS: NavItem[] = [
   { to: '/', label: 'Live', end: true, minRole: 'viewer' },
+  { to: '/dashboard', label: 'Dashboard', minRole: 'viewer' },
   { to: '/signal', label: 'Signal', minRole: 'operator' },
   { to: '/signal-timing', label: 'Signal Timing', minRole: 'operator' },
   { to: '/forecast', label: 'Forecast', minRole: 'operator' },

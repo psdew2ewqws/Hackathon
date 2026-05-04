@@ -702,6 +702,64 @@ async def api_health() -> dict:
     }
 
 
+@app.post("/api/video/restart")
+async def api_video_restart() -> dict:
+    """Kill the current ffmpeg RTSP push loop and restart it from frame 0.
+    The new ffmpeg writes a fresh ffmpeg_start.txt; the signal sim re-anchors
+    on the next tick so NS GREEN ON aligns with video_ts=0 again."""
+    import signal as _signal
+    import subprocess as _subprocess
+    import time as _time
+
+    rtsp_match = "ffmpeg.*rtsp://127.0.0.1:8554/wadi_saqra"
+    killed: list[int] = []
+    try:
+        out = _subprocess.run(
+            ["pgrep", "-f", rtsp_match],
+            capture_output=True, text=True, timeout=2,
+        )
+        for line in out.stdout.splitlines():
+            try:
+                pid = int(line.strip())
+            except ValueError:
+                continue
+            try:
+                os.kill(pid, _signal.SIGKILL)
+                killed.append(pid)
+            except ProcessLookupError:
+                pass
+    except Exception as exc:
+        LOG.warning("video.restart pgrep/kill failed: %s", exc)
+
+    script = ROOT / "phase3-fullstack" / "scripts" / "run_rtsp.sh"
+    log_dir = ROOT / "phase3-fullstack" / "data" / "logs"
+    log_dir.mkdir(parents=True, exist_ok=True)
+    log_path = log_dir / "ffmpeg_push.log"
+    start_file = ROOT / "phase3-fullstack" / "data" / "ffmpeg_start.txt"
+    prev_mtime = start_file.stat().st_mtime if start_file.exists() else 0.0
+
+    log_fp = log_path.open("ab")
+    _subprocess.Popen(
+        [str(script)],
+        stdout=log_fp, stderr=log_fp,
+        start_new_session=True,
+    )
+
+    deadline = _time.monotonic() + 5.0
+    while _time.monotonic() < deadline:
+        if start_file.exists() and start_file.stat().st_mtime > prev_mtime:
+            break
+        await asyncio.sleep(0.1)
+
+    new_start = None
+    if start_file.exists():
+        try:
+            new_start = float(start_file.read_text().strip())
+        except ValueError:
+            new_start = None
+    return {"killed": killed, "ffmpeg_start": new_start}
+
+
 @app.get("/api/tracker/backend")
 async def api_tracker_backend_get() -> dict:
     """Public read of which detector backend is currently producing boxes."""
@@ -741,15 +799,33 @@ def _lanespec_to_jsonable(ls) -> dict:
 
 @app.get("/api/lanes/state")
 async def api_lanes_state() -> dict:
-    """Per-lane snapshot for every approach. Empty `lanes` ⇒ no calibration yet."""
+    """Per-lane snapshot for every approach.
+
+    Empty `lanes` ⇒ no calibration yet. `approach_geometry` is included so the
+    LaneCalibrationPage can compute the perspective-correct equal-divide
+    tool client-side without needing a separate roundtrip — lane geometry
+    is stored in REFERENCE-frame coords (matches the snapshot the editor
+    draws on).
+    """
     snap = _tracker.state.counts or {}
     saved: dict[str, list[dict]] = {}
+    geometry: dict[str, dict] = {}
     if _tracker.counter is not None:
         for approach, lanes in (_tracker.counter.lane_zones or {}).items():
             saved[approach] = [_lanespec_to_jsonable(lz) for lz in lanes]
+        for z in _tracker.counter.zones:
+            geometry[z.approach] = {
+                "approach_polygon": z.polygon.tolist(),
+                "stop_line": (
+                    [list(z.stop_line[0]), list(z.stop_line[1])]
+                    if z.stop_line is not None else None
+                ),
+                "direction_of_travel": z.direction_of_travel,
+            }
     return {
         "saved_lanes": saved,
         "live": {a: snap.get(a, {}).get("lanes", {}) for a in snap},
+        "approach_geometry": geometry,
     }
 
 
@@ -861,6 +937,101 @@ async def api_lanes_calibrate(
             )
 
     return {"saved": True, "lanes_written": written}
+
+
+class _ApproachZoneBody(BaseModel):
+    approach: str           # "S" | "N" | "E" | "W"
+    polygon: list[list[int]]
+    stop_line: list[list[int]] | None = None
+    direction_of_travel: str | None = None
+    label: str | None = None
+
+
+class _ZonesCalibrationBody(BaseModel):
+    zones: list[_ApproachZoneBody]
+
+
+@app.post("/api/zones/calibrate")
+async def api_zones_calibrate(
+    body: _ZonesCalibrationBody,
+    ctx: AuthContext = Depends(require_role("operator")),
+) -> dict:
+    """Persist operator-edited approach polygons + stop_lines to wadi_saqra_zones.json.
+
+    Approach polygons (S/N/E/W) are the outer containers that define
+    *where* each approach lives on the frame. They were originally
+    hand-defined in wadi_saqra_zones.json — this endpoint lets the
+    operator redraw them from the LaneCalibrationPage's approach-editor
+    mode. The resulting zones config is atomic-written and the live
+    counter reloads its zones immediately.
+
+    Existing per-approach `lanes` are preserved if they exist for the
+    same approach (so editing the outer polygon doesn't wipe lane work).
+    """
+    import json as _json
+    import tempfile
+
+    zones_path = _tracker.cfg.zones_path
+    try:
+        with zones_path.open() as fp:
+            cfg = _json.load(fp)
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=500, detail=f"could not read zones: {exc}") from exc
+
+    # Index existing zones by approach so we can preserve their lanes
+    # array (and any other metadata) while replacing the geometry.
+    by_approach = {z["approach"]: z for z in cfg.get("zones", [])}
+    written = 0
+    for z_in in body.zones:
+        if z_in.approach not in ("S", "N", "E", "W"):
+            raise HTTPException(status_code=400,
+                                detail=f"approach must be S/N/E/W, got {z_in.approach!r}")
+        if len(z_in.polygon) < 3:
+            raise HTTPException(status_code=400,
+                                detail=f"approach {z_in.approach}: polygon needs ≥3 vertices")
+        existing = by_approach.get(z_in.approach) or {"approach": z_in.approach, "lanes": []}
+        cleaned = {
+            "approach": z_in.approach,
+            "label": z_in.label or existing.get("label", f"{z_in.approach} approach"),
+            "polygon": [[int(x), int(y)] for x, y in z_in.polygon],
+            "stop_line": (
+                [[int(x), int(y)] for x, y in z_in.stop_line]
+                if z_in.stop_line and len(z_in.stop_line) >= 2 else existing.get("stop_line")
+            ),
+            "direction_of_travel": z_in.direction_of_travel or existing.get("direction_of_travel", "up"),
+            "lanes": existing.get("lanes") or [],
+        }
+        by_approach[z_in.approach] = cleaned
+        written += 1
+    cfg["zones"] = list(by_approach.values())
+
+    tmp = tempfile.NamedTemporaryFile(
+        mode="w", suffix=".json", dir=zones_path.parent, delete=False,
+    )
+    try:
+        _json.dump(cfg, tmp, indent=2)
+        tmp.flush()
+        tmp.close()
+        Path(tmp.name).replace(zones_path)
+    except Exception:
+        Path(tmp.name).unlink(missing_ok=True)
+        raise
+
+    # Reload the live counter — same dance the lanes endpoint does.
+    from .counters import LaneState, load_lane_zones, load_zones
+    new_zones = load_zones(zones_path)
+    new_lane_zones = load_lane_zones(zones_path)
+    if _tracker.counter is not None:
+        _tracker.counter.zones = new_zones
+        _tracker.counter.lane_zones = {z.approach: [] for z in new_zones}
+        _tracker.counter.lane_state = {z.approach: {} for z in new_zones}
+        for lz in new_lane_zones:
+            _tracker.counter.lane_zones.setdefault(lz.approach, []).append(lz)
+            _tracker.counter.lane_state.setdefault(lz.approach, {})[lz.lane_id] = LaneState(
+                lane_id=lz.lane_id, lane_idx=lz.lane_idx, lane_type=lz.lane_type,
+            )
+
+    return {"saved": True, "approaches_written": written}
 
 
 @app.get("/api/lanes/drift")
@@ -1330,7 +1501,11 @@ def _llm_signal_plan_provider() -> dict:
     }
 
 
+_TYPICAL_DAY_JSON_PATH = ROOT / "data" / "research" / "gmaps" / "typical_2026-04-26.json"
+
+
 def _llm_build_context() -> _LLMContext:
+    typical = _TYPICAL_DAY_JSON_PATH if _TYPICAL_DAY_JSON_PATH.exists() else None
     return _LLMContext(
         db=_db,
         db_path=Path(_DEFAULT_DB_PATH),
@@ -1339,6 +1514,7 @@ def _llm_build_context() -> _LLMContext:
         forecast=_llm_forecast_provider,
         recommendation=_llm_recommendation_provider,
         signal_plan=_llm_signal_plan_provider,
+        typical_day_json=typical,
     )
 
 
@@ -1685,7 +1861,18 @@ async def ws_counts(ws: WebSocket) -> None:
 
 _REACT_DIST = ROOT / "frontend" / "dist"
 if _REACT_DIST.exists():
-    app.mount("/app", StaticFiles(directory=str(_REACT_DIST), html=True), name="app")
+    class _SPAStaticFiles(StaticFiles):
+        """StaticFiles that falls back to index.html for unknown paths so
+        BrowserRouter deep-links (e.g. /app/dashboard, /app/login) survive
+        a hard refresh instead of returning 404."""
+
+        async def get_response(self, path, scope):  # type: ignore[override]
+            try:
+                return await super().get_response(path, scope)
+            except Exception:
+                return await super().get_response("index.html", scope)
+
+    app.mount("/app", _SPAStaticFiles(directory=str(_REACT_DIST), html=True), name="app")
 
 # Serve the markdown docs read-only so the dashboard can link to them.
 _DOCS_DIR = ROOT / "phase3-fullstack" / "docs"

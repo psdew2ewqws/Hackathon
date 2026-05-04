@@ -154,3 +154,20 @@ export interface ForecastResponse {
   predicted: Record<Approach, PredictedRow>;
   recommendation: Recommendation;
 }
+
+// /api/forecast/ml — LightGBM per-detector horizon predictions.
+export interface ForecastMlPerDetector {
+  approach: Approach;
+  y_now: number;
+  y_15min: number;
+  y_30min: number;
+  y_60min: number;
+}
+
+export interface ForecastMlResponse {
+  available: boolean;
+  target_ts?: string;
+  horizons_min?: number[];
+  per_detector?: Record<string, ForecastMlPerDetector>;
+  message?: string;
+}

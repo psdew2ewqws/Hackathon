@@ -7,6 +7,7 @@ escape hatch goes through ``safety.execute_readonly``.
 """
 from __future__ import annotations
 
+import json
 import logging
 from dataclasses import dataclass
 from pathlib import Path
@@ -48,6 +49,25 @@ class LLMContext:
     forecast: ForecastProvider
     recommendation: RecommendationProvider
     signal_plan: SignalPlanProvider
+    typical_day_json: Path | None = None
+
+
+_TYPICAL_DAY_CACHE: dict[Path, dict[str, Any]] = {}
+
+
+def _load_typical_day(path: Path) -> dict[str, Any]:
+    cached = _TYPICAL_DAY_CACHE.get(path)
+    if cached is not None:
+        return cached
+    data = json.loads(path.read_text())
+    _TYPICAL_DAY_CACHE[path] = data
+    return data
+
+
+def _snap_half_hour(hour: float) -> str:
+    snapped = round(float(hour) * 2) / 2
+    snapped = max(0.0, min(23.5, snapped))
+    return f"{snapped:.1f}"
 
 
 # ---------------------------------------------------------------------------
@@ -137,6 +157,45 @@ def _tool_list_incidents(args: dict, ctx: LLMContext) -> dict:
 
 def _tool_get_signal_plan(args: dict, ctx: LLMContext) -> dict:
     return ctx.signal_plan()
+
+
+def _tool_get_typical_day_gmaps(args: dict, ctx: LLMContext) -> dict:
+    if ctx.typical_day_json is None or not ctx.typical_day_json.exists():
+        return {
+            "available": False,
+            "message": "typical-day JSON not configured on this server. "
+                       "Run tools/build_typical_day_json.py to generate it.",
+        }
+    data = _load_typical_day(ctx.typical_day_json)
+    corridor = args.get("corridor")
+    if corridor is not None and corridor not in ("S", "N", "E", "W"):
+        return {"error": f"corridor must be S/N/E/W, got {corridor!r}"}
+
+    hour_arg = args.get("hour")
+    hour_key: str | None = None
+    if hour_arg is not None:
+        try:
+            hour_key = _snap_half_hour(float(hour_arg))
+        except (TypeError, ValueError):
+            return {"error": f"hour must be a number 0.0-23.5, got {hour_arg!r}"}
+
+    base = {
+        "site_id": data.get("site_id"),
+        "captured": data.get("captured"),
+        "schema_version": data.get("schema_version"),
+        "summary": data.get("summary"),
+    }
+    corridors = data.get("corridors", {})
+
+    if corridor and hour_key is not None:
+        row = corridors.get(corridor, {}).get(hour_key)
+        return {**base, "corridor": corridor, "hour": float(hour_key), "row": row}
+    if corridor:
+        return {**base, "corridor": corridor, "rows": corridors.get(corridor, {})}
+    if hour_key is not None:
+        slice_ = {c: corridors.get(c, {}).get(hour_key) for c in ("S", "N", "E", "W")}
+        return {**base, "hour": float(hour_key), "rows": slice_}
+    return {**base, "corridors": corridors}
 
 
 def _tool_query_sqlite(args: dict, ctx: LLMContext) -> dict:
@@ -241,6 +300,25 @@ TOOL_SCHEMAS: list[dict[str, Any]] = [
         "input_schema": {"type": "object", "properties": {}, "additionalProperties": False},
     },
     {
+        "name": "get_typical_day_gmaps",
+        "description": (
+            "Return Google-typical-day congestion for the Wadi Saqra intersection "
+            "(per-corridor x half-hour). Without args, returns the full 4-corridor x "
+            "48-half-hour grid plus daily summary. With corridor (N/S/E/W), filters to "
+            "that corridor. With hour (0.0-23.5, half-hour snapped), returns just that "
+            "time slot. Use to compare 'is right now better or worse than typical for "
+            "this hour?'. Cells are null where the gmaps API failed."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "corridor": {"type": "string", "enum": ["N", "S", "E", "W"]},
+                "hour": {"type": "number", "minimum": 0.0, "maximum": 23.5},
+            },
+            "additionalProperties": False,
+        },
+    },
+    {
         "name": "query_sqlite",
         "description": (
             "Read-only SELECT (or WITH ... SELECT) against the local SQLite database. "
@@ -271,6 +349,7 @@ _DISPATCH: dict[str, Callable[[dict, LLMContext], dict]] = {
     "get_recommendation": _tool_get_recommendation,
     "list_incidents": _tool_list_incidents,
     "get_signal_plan": _tool_get_signal_plan,
+    "get_typical_day_gmaps": _tool_get_typical_day_gmaps,
     "query_sqlite": _tool_query_sqlite,
 }
 

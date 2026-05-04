@@ -23,6 +23,7 @@ EXPECTED_TOOL_NAMES = {
     "get_recommendation",
     "list_incidents",
     "get_signal_plan",
+    "get_typical_day_gmaps",
     "query_sqlite",
 }
 
@@ -99,3 +100,36 @@ def test_unknown_tool_returns_error_payload(tmp_path, phase3_db_path):
     result = _call_tool_sync(server, "no_such_tool", {})
     obj = json.loads(result.root.content[0].text)
     assert "error" in obj
+
+
+def test_typical_day_gmaps_corridor_hour(tmp_path, phase3_db_path):
+    server = build_server(build_context(db_path=phase3_db_path))
+    result = _call_tool_sync(
+        server, "get_typical_day_gmaps", {"corridor": "E", "hour": 14.0}
+    )
+    obj = json.loads(result.root.content[0].text)
+    assert obj.get("corridor") == "E"
+    assert obj.get("hour") == 14.0
+    row = obj.get("row")
+    assert row is not None, "E@14.0 should be filled in the source ndjson"
+    assert "congestion_ratio" in row
+    assert "congestion_label" in row
+
+
+def test_typical_day_gmaps_full_grid(tmp_path, phase3_db_path):
+    server = build_server(build_context(db_path=phase3_db_path))
+    result = _call_tool_sync(server, "get_typical_day_gmaps", {})
+    obj = json.loads(result.root.content[0].text)
+    corridors = obj.get("corridors") or {}
+    assert set(corridors.keys()) == {"N", "S", "E", "W"}
+    for c, bins in corridors.items():
+        assert len(bins) == 48, f"{c} should have 48 half-hour bins"
+
+
+def test_typical_day_gmaps_schema_rejects_bad_corridor(tmp_path, phase3_db_path):
+    """The MCP layer should reject invalid enum values via the input schema
+    (not even reach the handler). We expect a non-JSON validation message."""
+    server = build_server(build_context(db_path=phase3_db_path))
+    result = _call_tool_sync(server, "get_typical_day_gmaps", {"corridor": "X"})
+    text = result.root.content[0].text
+    assert "validation error" in text.lower() or "not one of" in text.lower()
