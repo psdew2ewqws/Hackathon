@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { AdvisorChatPanel } from '../components/v2/AdvisorChatPanel';
 import { AIPipelineStrip } from '../components/v2/AIPipelineStrip';
 import { AIStackPanel } from '../components/v2/AIStackPanel';
 import { ForecastStrip } from '../components/v2/ForecastStrip';
@@ -41,13 +42,16 @@ export function DashboardV2() {
           gap: 12,
         }}
       >
-        {/* Hero · Live feed (62%) | AI stack (38%) */}
+        {/* Hero · Live feed (62%) | AI stack (38%) — align top so the
+            live feed keeps its 848:478 aspect ratio without being
+            stretched by the taller AI stack column */}
         <div
           className="rise rise-d-1"
           style={{
             display: 'grid',
             gridTemplateColumns: 'minmax(0, 1.62fr) minmax(360px, 1fr)',
             gap: 12,
+            alignItems: 'start',
           }}
         >
           <LiveFeedPanel />
@@ -101,6 +105,11 @@ export function DashboardV2() {
         >
           <LiveEventsPanel />
           <RecentSignalPanel />
+        </div>
+
+        {/* AI advisor chat — full width, primary interaction surface */}
+        <div className="rise rise-d-6">
+          <AdvisorChatPanel />
         </div>
       </main>
     </div>

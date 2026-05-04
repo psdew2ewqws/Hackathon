@@ -19,14 +19,15 @@ import { ChatPage } from './pages/ChatPage';
 function Shell({ children }: { children: React.ReactNode }) {
   const location = useLocation();
   const hideNav = location.pathname === '/login';
-  // The /dashboard route ships its own integrated operator topbar so the
-  // generic green-pill nav doesn't clash with the editorial design.
+  // The /dashboard route ships its own integrated operator topbar — hide
+  // the generic green-pill nav there. The advisor drawer stays visible so
+  // operators can ask the LLM questions from any route.
   const fullBleed = location.pathname === '/dashboard';
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--fg)' }}>
       {!hideNav && !fullBleed && <Nav />}
       {children}
-      {!hideNav && !fullBleed && <AdvisorDrawer />}
+      {!hideNav && <AdvisorDrawer />}
     </div>
   );
 }

@@ -70,7 +70,7 @@ export function LiveFeedPanel() {
         padding: 14,
         display: 'flex',
         flexDirection: 'column',
-        height: '100%',
+        alignSelf: 'start',
       }}
     >
       <div
@@ -133,11 +133,10 @@ export function LiveFeedPanel() {
         style={{
           position: 'relative',
           width: '100%',
-          flex: '1 1 auto',
+          aspectRatio: '848 / 478',
           background: '#000',
           borderRadius: 'var(--r-md)',
           overflow: 'hidden',
-          aspectRatio: '848 / 478',
           border: '1px solid var(--border)',
           boxShadow: 'var(--shadow-1)',
         }}
@@ -146,10 +145,12 @@ export function LiveFeedPanel() {
           src={apiUrl('/mjpeg')}
           alt="annotated tracker feed"
           style={{
+            position: 'absolute',
+            inset: 0,
             width: '100%',
             height: '100%',
             display: 'block',
-            objectFit: 'cover',
+            objectFit: 'contain',
           }}
         />
 
