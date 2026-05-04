@@ -16,10 +16,10 @@ const LABEL_TONE: Record<string, string> = {
 };
 
 const APPROACH_FULL: Record<Approach, string> = {
-  N: 'north',
-  S: 'south',
-  E: 'east',
-  W: 'west',
+  N: 'NORTH',
+  S: 'SOUTH',
+  E: 'EAST',
+  W: 'WEST',
 };
 
 function fmt(n: number | undefined | null, digits = 0): string {
@@ -58,42 +58,15 @@ export function LiveKpiRow() {
         background: 'var(--surface-2)',
         border: '1px solid var(--border-soft)',
         borderRadius: 'var(--r-md)',
-        padding: '14px 16px',
+        padding: '10px 12px 12px',
       }}
     >
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'baseline',
-          marginBottom: 12,
-        }}
-      >
-        <div
-          style={{
-            font: 'italic 400 18px var(--display)',
-            color: 'var(--fg)',
-            letterSpacing: '-0.01em',
-          }}
-        >
-          Per-approach state
-        </div>
-        <div
-          style={{
-            font: '500 9px var(--mono)',
-            letterSpacing: '0.18em',
-            textTransform: 'uppercase',
-            color: 'var(--fg-faint)',
-          }}
-        >
-          {error ? 'reconnecting' : 'fused · 1 hz'}
-        </div>
-      </div>
+      <PanelHeader title="Per-approach state" meta={error ? 'reconnecting…' : 'fused · 1 Hz'} />
       <div
         style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(4, minmax(0, 1fr))',
-          gap: 10,
+          gap: 8,
         }}
       >
         {APPROACHES.map((a) => {
@@ -110,7 +83,7 @@ export function LiveKpiRow() {
                 background: 'var(--surface)',
                 border: '1px solid var(--border-soft)',
                 borderRadius: 'var(--r-md)',
-                padding: '12px 14px 14px',
+                padding: '10px 12px 11px',
                 overflow: 'hidden',
               }}
             >
@@ -120,7 +93,7 @@ export function LiveKpiRow() {
                   left: 0,
                   top: 0,
                   bottom: 0,
-                  width: 3,
+                  width: 2,
                   background: approachColor,
                 }}
               />
@@ -128,14 +101,14 @@ export function LiveKpiRow() {
                 style={{
                   display: 'flex',
                   justifyContent: 'space-between',
-                  alignItems: 'baseline',
-                  marginBottom: 10,
+                  alignItems: 'center',
+                  marginBottom: 6,
                 }}
               >
-                <div>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
                   <span
                     style={{
-                      font: '700 14px var(--mono)',
+                      font: '700 13px var(--mono)',
                       color: approachColor,
                       letterSpacing: '0.04em',
                     }}
@@ -145,10 +118,8 @@ export function LiveKpiRow() {
                   <span
                     style={{
                       font: '500 9px var(--mono)',
-                      letterSpacing: '0.16em',
-                      textTransform: 'uppercase',
+                      letterSpacing: '0.18em',
                       color: 'var(--fg-faint)',
-                      marginLeft: 6,
                     }}
                   >
                     {APPROACH_FULL[a as Approach]}
@@ -158,12 +129,11 @@ export function LiveKpiRow() {
                   style={{
                     font: '600 9px var(--mono)',
                     textTransform: 'uppercase',
-                    letterSpacing: '0.16em',
+                    letterSpacing: '0.18em',
                     color: tone,
-                    padding: '2px 7px',
-                    borderRadius: 999,
+                    padding: '2px 6px',
+                    borderRadius: 4,
                     border: `1px solid ${tone}`,
-                    background: 'transparent',
                   }}
                 >
                   {row?.label ?? (error ? 'err' : '—')}
@@ -171,10 +141,11 @@ export function LiveKpiRow() {
               </div>
 
               <div
+                className="tabular"
                 style={{
-                  font: 'italic 400 38px var(--display)',
-                  color: 'var(--fg)',
-                  letterSpacing: '-0.02em',
+                  font: '700 30px var(--sans)',
+                  color: 'var(--fg-bright)',
+                  letterSpacing: '-0.025em',
                   lineHeight: 1,
                   marginBottom: 2,
                 }}
@@ -184,10 +155,10 @@ export function LiveKpiRow() {
               <div
                 style={{
                   font: '500 9px var(--mono)',
-                  letterSpacing: '0.18em',
+                  letterSpacing: '0.16em',
                   textTransform: 'uppercase',
                   color: 'var(--fg-faint)',
-                  marginBottom: 12,
+                  marginBottom: 9,
                 }}
               >
                 pressure index
@@ -197,12 +168,12 @@ export function LiveKpiRow() {
                 style={{
                   display: 'grid',
                   gridTemplateColumns: '1fr 1fr 1fr',
-                  gap: 10,
-                  paddingTop: 10,
+                  gap: 8,
+                  paddingTop: 9,
                   borderTop: '1px solid var(--border-soft)',
                 }}
               >
-                <Stat label="in zone" value={fmt(row?.in_zone)} />
+                <Stat label="zone" value={fmt(row?.in_zone)} />
                 <Stat label="queue" value={fmt(row?.queue)} />
                 <Stat label="gmaps" value={fmt(row?.gmaps_congestion_ratio, 2)} />
               </div>
@@ -214,23 +185,58 @@ export function LiveKpiRow() {
   );
 }
 
+function PanelHeader({ title, meta }: { title: string; meta: string }) {
+  return (
+    <div
+      style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'baseline',
+        marginBottom: 10,
+      }}
+    >
+      <div
+        style={{
+          font: '600 11px var(--mono)',
+          letterSpacing: '0.16em',
+          textTransform: 'uppercase',
+          color: 'var(--fg-bright)',
+        }}
+      >
+        {title}
+      </div>
+      <div
+        style={{
+          font: '500 10px var(--mono)',
+          letterSpacing: '0.12em',
+          textTransform: 'uppercase',
+          color: 'var(--fg-faint)',
+        }}
+      >
+        {meta}
+      </div>
+    </div>
+  );
+}
+
 function Stat({ label, value }: { label: string; value: string }) {
   return (
     <div>
       <div
         style={{
-          font: '500 9px var(--mono)',
+          font: '500 8.5px var(--mono)',
           letterSpacing: '0.16em',
           textTransform: 'uppercase',
           color: 'var(--fg-faint)',
-          marginBottom: 2,
+          marginBottom: 1,
         }}
       >
         {label}
       </div>
       <div
+        className="tabular"
         style={{
-          font: '600 15px var(--mono)',
+          font: '600 14px var(--mono)',
           color: 'var(--fg)',
           letterSpacing: '-0.01em',
         }}

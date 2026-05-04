@@ -155,7 +155,7 @@ function AIBlock({
       >
         <div
           style={{
-            font: 'italic 400 22px var(--display)',
+            font: '600 16px var(--sans)',
             color: 'var(--fg)',
             letterSpacing: '-0.01em',
             lineHeight: 1.05,
@@ -313,40 +313,28 @@ export function AIStackPanel() {
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'baseline',
-          marginBottom: 2,
+          marginBottom: 4,
         }}
       >
-        <div>
-          <div
-            style={{
-              font: 'italic 400 21px var(--display)',
-              color: 'var(--fg)',
-              letterSpacing: '-0.01em',
-              lineHeight: 1,
-            }}
-          >
-            Inference stack
-          </div>
-          <div
-            style={{
-              font: '500 9px var(--mono)',
-              letterSpacing: '0.18em',
-              textTransform: 'uppercase',
-              color: 'var(--fg-faint)',
-              marginTop: 4,
-            }}
-          >
-            six models · one operator
-          </div>
+        <div
+          style={{
+            font: '600 11px var(--mono)',
+            letterSpacing: '0.16em',
+            textTransform: 'uppercase',
+            color: 'var(--fg-bright)',
+          }}
+        >
+          AI inference stack
         </div>
         <div
           style={{
             font: '500 10px var(--mono)',
+            letterSpacing: '0.12em',
+            textTransform: 'uppercase',
             color: 'var(--ai)',
-            letterSpacing: '0.06em',
           }}
         >
-          AI · live
+          6 models · live
         </div>
       </div>
 

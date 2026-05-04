@@ -110,26 +110,26 @@ export function AIPipelineStrip() {
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'baseline',
-          marginBottom: 12,
+          marginBottom: 14,
         }}
       >
-        <div>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 12 }}>
           <span
             style={{
-              font: 'italic 400 18px var(--display)',
-              color: 'var(--fg)',
-              letterSpacing: '-0.01em',
+              font: '600 11px var(--mono)',
+              letterSpacing: '0.16em',
+              textTransform: 'uppercase',
+              color: 'var(--fg-bright)',
             }}
           >
             Inference pipeline
           </span>
           <span
             style={{
-              font: '500 9px var(--mono)',
-              letterSpacing: '0.18em',
+              font: '500 10px var(--mono)',
+              letterSpacing: '0.12em',
               textTransform: 'uppercase',
               color: 'var(--fg-faint)',
-              marginLeft: 14,
             }}
           >
             video frame → operator decision
@@ -139,7 +139,7 @@ export function AIPipelineStrip() {
           style={{
             font: '500 10px var(--mono)',
             color: 'var(--fg-faint)',
-            letterSpacing: '0.06em',
+            letterSpacing: '0.04em',
           }}
         >
           {fps > 0 ? `${fps.toFixed(1)} fps` : 'idle'} · queue {queueDepth} · {counts.toLocaleString()} bins

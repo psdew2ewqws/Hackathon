@@ -19,11 +19,14 @@ import { ChatPage } from './pages/ChatPage';
 function Shell({ children }: { children: React.ReactNode }) {
   const location = useLocation();
   const hideNav = location.pathname === '/login';
+  // The /dashboard route ships its own integrated operator topbar so the
+  // generic green-pill nav doesn't clash with the editorial design.
+  const fullBleed = location.pathname === '/dashboard';
   return (
-    <div style={{ minHeight: '100vh', background: '#0b0f14', color: '#e6edf3' }}>
-      {!hideNav && <Nav />}
+    <div style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--fg)' }}>
+      {!hideNav && !fullBleed && <Nav />}
       {children}
-      {!hideNav && <AdvisorDrawer />}
+      {!hideNav && !fullBleed && <AdvisorDrawer />}
     </div>
   );
 }

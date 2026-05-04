@@ -77,68 +77,54 @@ export function LiveFeedPanel() {
         style={{
           display: 'flex',
           justifyContent: 'space-between',
-          alignItems: 'flex-end',
-          marginBottom: 12,
+          alignItems: 'center',
+          marginBottom: 10,
         }}
       >
-        <div>
-          <div
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 12 }}>
+          <span
             style={{
-              font: 'italic 400 26px var(--display)',
-              color: 'var(--fg)',
-              letterSpacing: '-0.015em',
-              lineHeight: 1,
+              font: '600 11px var(--mono)',
+              letterSpacing: '0.16em',
+              textTransform: 'uppercase',
+              color: 'var(--fg-bright)',
             }}
           >
             Live feed
-          </div>
-          <div
+          </span>
+          <span
             style={{
-              font: '500 9px var(--mono)',
-              letterSpacing: '0.18em',
+              font: '500 10px var(--mono)',
+              letterSpacing: '0.12em',
               textTransform: 'uppercase',
               color: 'var(--fg-faint)',
-              marginTop: 5,
             }}
           >
-            wadi saqra · 848 × 478 · annotated
-          </div>
+            wadi saqra · 848×478 · {pendingName ? `loading ${pendingName}` : activeName}
+          </span>
         </div>
-        <div style={{ textAlign: 'right' }}>
-          <div
+        <div
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 6,
+            font: '600 11px var(--mono)',
+            color: dotColor,
+            letterSpacing: '0.04em',
+          }}
+        >
+          <span
+            className={running ? 'dot-pulse' : ''}
             style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 7,
-              font: '600 11px var(--mono)',
-              color: dotColor,
-              letterSpacing: '0.04em',
+              width: 7,
+              height: 7,
+              borderRadius: '50%',
+              background: dotColor,
+              boxShadow: running ? `0 0 8px ${dotColor}` : 'none',
+              display: 'inline-block',
             }}
-          >
-            <span
-              className={running ? 'dot-pulse' : ''}
-              style={{
-                width: 8,
-                height: 8,
-                borderRadius: '50%',
-                background: dotColor,
-                boxShadow: running ? `0 0 10px ${dotColor}` : 'none',
-                display: 'inline-block',
-              }}
-            />
-            {running ? `${fps.toFixed(1)} FPS` : pendingName ? 'WARMING' : 'IDLE'}
-          </div>
-          <div
-            style={{
-              font: '500 9px var(--mono)',
-              letterSpacing: '0.16em',
-              textTransform: 'uppercase',
-              color: 'var(--fg-faint)',
-              marginTop: 4,
-            }}
-          >
-            {pendingName ? `loading ${pendingName}` : `via ${activeName}`}
-          </div>
+          />
+          {running ? `${fps.toFixed(1)} FPS` : pendingName ? 'WARMING' : 'IDLE'}
         </div>
       </div>
 

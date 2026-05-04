@@ -1,67 +1,68 @@
 /* ─────────────────────────────────────────────────────────────────────
- * Traffic Intel · editorial mission-control palette
+ * Traffic Intel · operator-grade dashboard tokens
  *
- * Display = Instrument Serif (italic for emphasis on numbers/labels).
- * Data    = JetBrains Mono.
- * Body    = Inter Tight.
+ * Display + body: Geist (sharp modern grotesque)
+ * Data:           Geist Mono / JetBrains Mono fallback
  *
- * Background is warm near-black; accents are operational amber + AI cyan.
- * The grain texture in body::before adds analog atmosphere — purely
- * decorative, very low opacity, doesn't fight readability.
+ * Bold weights carry emphasis instead of italic serif. Designed for
+ * widescreen ops terminals — dense, edge-to-edge, no editorial flourish.
  * ─────────────────────────────────────────────────────────────────── */
 
 :root {
   color-scheme: dark;
 
-  /* Surface — deeper, warmer, with subtle hierarchy */
-  --bg:          #0c0d10;
-  --surface:     #131519;
-  --surface-2:   #181a20;
-  --surface-3:   #1d2028;
-  --hover:       #20232b;
-  --border:      #262a33;
-  --border-soft: #1c1f25;
+  /* Surface — quiet, with subtle hierarchy */
+  --bg:           #08090c;
+  --surface:      #11131a;
+  --surface-2:    #161922;
+  --surface-3:    #1c2030;
+  --hover:        #20242f;
+  --border:       #262a35;
+  --border-soft:  #1b1e27;
+  --border-bold:  #353a48;
 
   /* Text */
-  --fg:       #ebecee;
-  --fg-dim:   #9aa0aa;
-  --fg-faint: #5e6470;
-  --fg-mute:  #3e434c;
+  --fg:        #e9eaee;
+  --fg-bright: #fafafc;
+  --fg-dim:    #98a0ad;
+  --fg-faint:  #5b6473;
+  --fg-mute:   #3a4150;
 
-  /* Operational amber (high-visibility — the safety colour of traffic ops) */
+  /* Operational accent — high-vis amber */
   --accent:       #ffb100;
   --accent-soft:  #c9881a;
   --accent-dim:   #8a5e15;
   --accent-ghost: rgba(255, 177, 0, 0.10);
 
-  /* AI/inference signal — kept distinct from operational amber */
-  --ai:           #4ac8e0;
-  --ai-soft:      #2c8aa0;
-  --ai-ghost:     rgba(74, 200, 224, 0.10);
+  /* AI / inference signal */
+  --ai:        #4dd0e8;
+  --ai-soft:   #2c8aa0;
+  --ai-ghost:  rgba(77, 208, 232, 0.10);
 
   /* Status */
-  --good:         #7FA889;
-  --warn:         #d68f6b;
-  --bad:          #e46f6f;
-  --critical:     #ff5454;
+  --good:      #6ed68f;
+  --warn:      #f7c469;
+  --bad:       #ff8266;
+  --critical:  #ff5960;
 
-  /* Type families */
-  --display: 'Instrument Serif', ui-serif, Georgia, 'Times New Roman', serif;
-  --sans:    'Inter Tight', system-ui, -apple-system, 'Segoe UI', sans-serif;
-  --mono:    'JetBrains Mono', ui-monospace, 'Fira Mono', 'DejaVu Sans Mono', monospace;
+  /* Type families — Geist + Geist Mono. NO serif display. */
+  --sans:    'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --display: 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --mono:    'Geist Mono', 'JetBrains Mono', ui-monospace, 'Fira Mono', monospace;
 
   /* Rhythm */
-  --r-sm: 6px;
-  --r-md: 10px;
-  --r-lg: 14px;
-  --r-xl: 20px;
+  --r-sm: 4px;
+  --r-md: 8px;
+  --r-lg: 12px;
+  --r-xl: 16px;
 
-  /* Shadows — only used sparingly for elevation moments */
-  --shadow-1: 0 1px 0 rgba(255,255,255,0.02), 0 8px 24px rgba(0,0,0,0.3);
-  --shadow-2: 0 1px 0 rgba(255,255,255,0.03), 0 18px 50px rgba(0,0,0,0.45);
+  /* Shadows */
+  --shadow-1: 0 1px 0 rgba(255,255,255,0.02), 0 8px 24px rgba(0,0,0,0.32);
+  --shadow-2: 0 1px 0 rgba(255,255,255,0.03), 0 18px 50px rgba(0,0,0,0.48);
 
-  font: 13px/1.55 var(--sans);
-  font-feature-settings: 'cv11' 1, 'ss01' 1, 'tnum' 1;
+  font: 13px/1.5 var(--sans);
+  font-feature-settings: 'cv11' 1, 'ss01' 1, 'tnum' 1, 'cv02' 1;
+  font-variation-settings: 'opsz' 16;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   color: var(--fg);
@@ -78,21 +79,27 @@ body, html, #root {
 
 body {
   background:
-    radial-gradient(ellipse 1100px 700px at 12% -10%, rgba(255, 177, 0, 0.04), transparent 60%),
-    radial-gradient(ellipse 900px 600px at 92% 110%,  rgba(74, 200, 224, 0.04), transparent 60%),
+    radial-gradient(ellipse 1200px 800px at 8% -8%,  rgba(255, 177, 0, 0.025), transparent 60%),
+    radial-gradient(ellipse 1000px 700px at 96% 108%, rgba(77, 208, 232, 0.025), transparent 60%),
     var(--bg);
   position: relative;
 }
 
-/* Subtle grain — the only texture, low opacity, gives the dark surfaces life. */
+/* Subtle grid pattern for the dashboard surface — operator-terminal vibe */
 body::before {
   content: '';
   position: fixed;
   inset: 0;
   pointer-events: none;
-  opacity: 0.035;
   z-index: 0;
-  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 0.7 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+  opacity: 0.5;
+  background-image:
+    linear-gradient(rgba(255,255,255,0.012) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.012) 1px, transparent 1px);
+  background-size: 40px 40px, 40px 40px;
+  background-position: -1px -1px;
+  mask-image: linear-gradient(180deg, transparent 0%, black 25%, black 100%);
+  -webkit-mask-image: linear-gradient(180deg, transparent 0%, black 25%, black 100%);
 }
 
 ::selection {
@@ -111,48 +118,38 @@ button {
   cursor: pointer;
 }
 
-/* Micro-utilities used by v2 components — italic display emphasis. */
-.display-italic {
-  font: italic 400 1em var(--display);
-  letter-spacing: -0.01em;
-}
-
-/* Subtle scan-line for the live feed iframe wrapper. */
-.scanlines {
-  position: relative;
-}
-.scanlines::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background: repeating-linear-gradient(
-    180deg,
-    rgba(255,255,255,0) 0,
-    rgba(255,255,255,0) 2px,
-    rgba(255,255,255,0.025) 2px,
-    rgba(255,255,255,0.025) 3px
-  );
-  mix-blend-mode: overlay;
-  border-radius: inherit;
-}
+/* Tabular numerals everywhere data is shown — locks digit widths so
+ * bouncing values don't shift adjacent columns. */
+.tabular { font-variant-numeric: tabular-nums; }
 
 /* Slow pulse for "active" status dots. */
 @keyframes pulse-soft {
   0%, 100% { opacity: 1; transform: scale(1); }
-  50%      { opacity: 0.55; transform: scale(0.85); }
+  50%      { opacity: 0.5; transform: scale(0.85); }
 }
-.dot-pulse { animation: pulse-soft 1.8s ease-in-out infinite; }
+.dot-pulse { animation: pulse-soft 1.6s ease-in-out infinite; }
 
-/* Stagger reveal — used by the dashboard grid for an editorial entrance. */
+/* Thin horizontal sweep for "scanning" feel on the live feed. */
+@keyframes sweep {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+/* Stagger reveal on first paint. */
 @keyframes rise {
-  from { opacity: 0; transform: translateY(8px); }
+  from { opacity: 0; transform: translateY(6px); }
   to   { opacity: 1; transform: translateY(0); }
 }
-.rise        { animation: rise 0.5s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
-.rise-d-1    { animation-delay: 60ms; }
-.rise-d-2    { animation-delay: 120ms; }
-.rise-d-3    { animation-delay: 180ms; }
-.rise-d-4    { animation-delay: 240ms; }
-.rise-d-5    { animation-delay: 300ms; }
-.rise-d-6    { animation-delay: 360ms; }
+.rise        { animation: rise 0.4s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+.rise-d-1    { animation-delay: 40ms; }
+.rise-d-2    { animation-delay: 80ms; }
+.rise-d-3    { animation-delay: 120ms; }
+.rise-d-4    { animation-delay: 160ms; }
+.rise-d-5    { animation-delay: 200ms; }
+.rise-d-6    { animation-delay: 240ms; }
+
+/* Compact scrollbars inside event lists / panels */
+.scroll-thin::-webkit-scrollbar      { width: 6px; height: 6px; }
+.scroll-thin::-webkit-scrollbar-track{ background: transparent; }
+.scroll-thin::-webkit-scrollbar-thumb{ background: var(--border); border-radius: 4px; }
+.scroll-thin::-webkit-scrollbar-thumb:hover { background: var(--border-bold); }
