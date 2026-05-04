@@ -1206,6 +1206,57 @@ async def api_forecast_ml_metrics() -> dict:
     return _forecast_model_metrics()
 
 
+@app.get("/api/simulation/seed")
+async def api_simulation_seed(
+    ctx: AuthContext = Depends(require_role("operator")),
+) -> dict:
+    """Seed payload for the /app/simulation tab.
+
+    Composes the current field signal plan, the LightGBM per-approach
+    forecast for the next hour, and the calibrated lane structure from
+    the zones config so the operator can start a what-if run that's
+    anchored to right-now state instead of a cold-start default.
+    """
+    plan = (_site.get("signal") or {}).get("current_plan") or {}
+    mode = (_site.get("signal") or {}).get("mode") or "two_phase"
+
+    # Per-approach forecast: aggregate per_detector by approach, four horizons.
+    fc = forecast_ml_horizons(target_ts=None)
+    per_approach: dict[str, dict[str, float]] = {a: {"y_now": 0.0, "y_15min": 0.0, "y_30min": 0.0, "y_60min": 0.0} for a in ("S", "N", "E", "W")}
+    if fc.get("available") and fc.get("per_detector"):
+        for det in fc["per_detector"].values():
+            a = det.get("approach")
+            if a in per_approach:
+                for h in ("y_now", "y_15min", "y_30min", "y_60min"):
+                    per_approach[a][h] += float(det.get(h) or 0.0)
+
+    # Lane structure: only the bits the simulation UI needs (approach, lane_id,
+    # lane_idx, lane_type) — drop the polygon arrays to keep the payload light.
+    zones_lite: list[dict] = []
+    try:
+        zones_raw = json.loads(ZONES_PATH.read_text())
+        for z in zones_raw.get("zones", []):
+            for ln in (z.get("lanes") or []):
+                zones_lite.append({
+                    "approach": z.get("approach"),
+                    "lane_id": ln.get("lane_id"),
+                    "lane_idx": ln.get("lane_idx"),
+                    "lane_type": ln.get("lane_type"),
+                })
+    except Exception:
+        LOG.exception("simulation/seed: failed to read zones")
+
+    return {
+        "signal": {
+            "mode": mode,
+            "current_plan": plan,
+        },
+        "forecast_per_approach": per_approach,
+        "forecast_available": bool(fc.get("available")),
+        "lanes": zones_lite,
+    }
+
+
 @app.get("/api/forecast/compare")
 async def api_forecast_compare(
     horizons_min: str = "0,15,30,60",

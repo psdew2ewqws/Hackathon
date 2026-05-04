@@ -6,6 +6,7 @@ import { RequireAuth } from './auth/RequireAuth';
 import { DashboardV2 } from './pages/DashboardV2';
 import { ForecastPage } from './pages/Forecast';
 import { LivePage } from './pages/Live';
+import { SimulationPage } from './pages/SimulationPage';
 import { SignalPage } from './pages/Signal';
 import { LoginPage } from './pages/LoginPage';
 import { IncidentsPage } from './pages/IncidentsPage';
@@ -19,10 +20,12 @@ import { ChatPage } from './pages/ChatPage';
 function Shell({ children }: { children: React.ReactNode }) {
   const location = useLocation();
   const hideNav = location.pathname === '/login';
-  // The /dashboard route ships its own integrated operator topbar — hide
-  // the generic green-pill nav there. The advisor drawer stays visible so
-  // operators can ask the LLM questions from any route.
-  const fullBleed = location.pathname === '/dashboard';
+  // The /dashboard and /simulation routes ship their own integrated
+  // OperatorTopBar — hide the generic green-pill nav there. The advisor
+  // drawer stays visible so operators can ask the LLM questions from any
+  // route.
+  const fullBleed =
+    location.pathname === '/dashboard' || location.pathname === '/simulation';
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--fg)' }}>
       {!hideNav && !fullBleed && <Nav />}
@@ -77,6 +80,14 @@ export default function App() {
               element={
                 <RequireAuth minRole="operator">
                   <ForecastPage />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/simulation"
+              element={
+                <RequireAuth minRole="operator">
+                  <SimulationPage />
                 </RequireAuth>
               }
             />

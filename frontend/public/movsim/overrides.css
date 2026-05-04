@@ -1,0 +1,30 @@
+/* Dark-theme overrides on top of movsim's stylesheets. Loaded after the
+ * upstream styles so anything we declare wins. Keep this file small —
+ * the rest comes from css/styleSliders.css and css/styleTrafficSimulationDe.css.
+ */
+
+html, body {
+  background: #0c0d10 !important;
+  color: #e9eaee !important;
+  font-family: 'Geist', system-ui, sans-serif !important;
+}
+
+/* Hide upstream nav / language flags / impressum links — we're embedding
+ * just the canvas + control sliders, not their full landing page. */
+#languageFlag, .languageFlag, #impressum, .impressum,
+#otherSimulations, #linkPanel, .linkPanel,
+.iconRow, .otherIcons {
+  display: none !important;
+}
+
+/* The simulation canvas should sit centred and dominate the viewport. */
+canvas {
+  background: #14171d !important;
+  border: 1px solid #262a35;
+  border-radius: 8px;
+}
+
+/* Slider track + handles — tone down the bright blue defaults. */
+.slider, .sliderVal, input[type="range"] {
+  accent-color: #ffb100;
+}

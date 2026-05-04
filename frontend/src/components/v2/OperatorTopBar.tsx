@@ -8,6 +8,7 @@ const NAV: Array<{ to: string; label: string; minRole: Role; end?: boolean }> = 
   { to: '/dashboard', label: 'Dashboard', minRole: 'viewer' },
   { to: '/signal', label: 'Signal', minRole: 'operator' },
   { to: '/forecast', label: 'Forecast', minRole: 'operator' },
+  { to: '/simulation', label: 'Simulation', minRole: 'operator' },
   { to: '/incidents', label: 'Incidents', minRole: 'operator' },
   { to: '/history', label: 'History', minRole: 'operator' },
   { to: '/lanes', label: 'Lanes', minRole: 'operator' },

@@ -6,6 +6,7 @@ import type {
   GmapsResponse,
   HeatmapResponse,
   RecommendationResponse,
+  SimulationSeed,
   SiteConfig,
 } from './types';
 
@@ -33,6 +34,16 @@ async function getJSON<T>(path: string, signal?: AbortSignal): Promise<T> {
   return (await r.json()) as T;
 }
 
+async function authedGetJSON<T>(path: string, signal?: AbortSignal): Promise<T> {
+  const t = localStorage.getItem('traffic_intel_token');
+  const r = await fetch(apiUrl(path), {
+    signal,
+    headers: t ? { Authorization: `Bearer ${t}` } : undefined,
+  });
+  if (!r.ok) throw new Error(`${path}: ${r.status}`);
+  return (await r.json()) as T;
+}
+
 export const getSite = (s?: AbortSignal) =>
   getJSON<SiteConfig>('/api/site', s);
 
@@ -56,3 +67,6 @@ export const getForecast = (hour: number, s?: AbortSignal) =>
 
 export const getForecastMl = (s?: AbortSignal) =>
   getJSON<ForecastMlResponse>('/api/forecast/ml', s);
+
+export const getSimulationSeed = (s?: AbortSignal) =>
+  authedGetJSON<SimulationSeed>('/api/simulation/seed', s);

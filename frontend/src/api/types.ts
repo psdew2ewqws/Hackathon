@@ -171,3 +171,32 @@ export interface ForecastMlResponse {
   per_detector?: Record<string, ForecastMlPerDetector>;
   message?: string;
 }
+
+// /api/simulation/seed — payload to seed the movsim what-if run.
+export interface SimulationSeedLane {
+  approach: Approach;
+  lane_id: string;
+  lane_idx: number;
+  lane_type: 'left' | 'through' | 'right' | 'shared' | string;
+}
+
+export interface SimulationSeed {
+  signal: {
+    mode: string;
+    current_plan: {
+      NS_green?: number;
+      EW_green?: number;
+      E_green?: number;
+      W_green?: number;
+      yellow?: number;
+      all_red?: number;
+      cycle_seconds?: number;
+    };
+  };
+  forecast_per_approach: Record<
+    Approach,
+    { y_now: number; y_15min: number; y_30min: number; y_60min: number }
+  >;
+  forecast_available: boolean;
+  lanes: SimulationSeedLane[];
+}
