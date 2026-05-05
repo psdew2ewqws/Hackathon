@@ -112,6 +112,7 @@ export function AIStackPanel() {
 
   const rfdetrActive = backend?.active === 'rfdetr';
   const yoloActive = backend?.active === 'ultralytics';
+  const yoloLActive = backend?.active === 'ultralytics_l';
   const fps = health?.tracker?.fps ?? 0;
   const detectorCount = useMemo(
     () => Object.keys(forecast?.per_detector ?? {}).length,
@@ -198,7 +199,7 @@ export function AIStackPanel() {
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: '1fr 1fr',
+          gridTemplateColumns: '1fr 1fr 1fr',
           gap: 8,
         }}
       >
@@ -225,6 +226,18 @@ export function AIStackPanel() {
           warming={backend?.pending === 'ultralytics'}
           busy={busy}
           onSwitch={() => switchBackend('ultralytics')}
+        />
+        <DetectorCard
+          name="YOLO 26L"
+          arch="convnet"
+          mAP={0.49}
+          params={25}
+          latency={45}
+          rationale="higher mAP · still real-time on MPS"
+          active={yoloLActive}
+          warming={backend?.pending === 'ultralytics_l'}
+          busy={busy}
+          onSwitch={() => switchBackend('ultralytics_l')}
         />
       </div>
 

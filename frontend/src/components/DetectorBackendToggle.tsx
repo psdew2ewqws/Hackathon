@@ -10,7 +10,8 @@ interface BackendState {
 
 const PRETTY: Record<string, string> = {
   rfdetr: 'RF-DETR',
-  ultralytics: 'YOLO',
+  ultralytics: 'YOLO 26n',
+  ultralytics_l: 'YOLO 26L',
 };
 
 export function DetectorBackendToggle() {

@@ -100,7 +100,7 @@ class TrackerService:
         # the worker has loaded each one.
         self._backends: dict = {}
         self._byte_trackers: dict = {}
-        self._available_backends: list[str] = ["ultralytics", "rfdetr"]
+        self._available_backends: list[str] = ["ultralytics", "ultralytics_l", "rfdetr"]
         self._active_backend: str = ""
         # Trajectory buffer (Phase 1.5): accumulates per-tid centroid paths
         # so the lane-induction algorithm can cluster them. Populated via
@@ -222,7 +222,7 @@ class TrackerService:
         # constructing the new one. On a 6 GB GPU this is mandatory —
         # holding both detectors plus their JIT/optimization caches has
         # been observed to wedge the driver.
-        AVAILABLE_BACKENDS = ("ultralytics", "rfdetr")
+        AVAILABLE_BACKENDS = ("ultralytics", "ultralytics_l", "rfdetr")
         initial_choice = _os.environ.get("DETECTOR_BACKEND", "rfdetr").lower()
         if initial_choice not in AVAILABLE_BACKENDS:
             initial_choice = "rfdetr"

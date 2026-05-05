@@ -18,6 +18,7 @@ interface BackendInfo {
 const BACKEND_NAME: Record<string, string> = {
   rfdetr: 'RF-DETR base',
   ultralytics: 'YOLO 26n',
+  ultralytics_l: 'YOLO 26L',
 };
 
 export function LiveFeedPanel() {

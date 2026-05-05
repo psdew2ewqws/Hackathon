@@ -13,6 +13,7 @@ LOG = logging.getLogger(__name__)
 #  parents[0]=traffic_intel_detector  [1]=src  [2]=phase3-fullstack  [3]=traffic-intel
 REPO_ROOT = Path(__file__).resolve().parents[3]
 DEFAULT_YOLO_WEIGHTS = REPO_ROOT / "yolo26n.pt"
+DEFAULT_YOLO_L_WEIGHTS = REPO_ROOT / "yolo26l.pt"
 
 
 def build_detector(
@@ -31,6 +32,12 @@ def build_detector(
         weights = weights or os.environ.get("YOLO_WEIGHTS") or str(DEFAULT_YOLO_WEIGHTS)
         return UltralyticsBackend(weights=weights, device=device, fp16=fp16)
 
+    if backend == "ultralytics_l":
+        from .ultralytics_backend import UltralyticsBackend
+
+        weights = weights or os.environ.get("YOLO_L_WEIGHTS") or str(DEFAULT_YOLO_L_WEIGHTS)
+        return UltralyticsBackend(weights=weights, device=device, fp16=fp16)
+
     if backend == "rfdetr":
         from .rfdetr_backend import RFDetrBackend
 
@@ -42,7 +49,7 @@ def build_detector(
             size=size, device=device, fp16=fp16, optimize=optimize
         )
 
-    raise ValueError(f"unknown DETECTOR_BACKEND={backend!r}; expected ultralytics|rfdetr")
+    raise ValueError(f"unknown DETECTOR_BACKEND={backend!r}; expected ultralytics|ultralytics_l|rfdetr")
 
 
 def build_tracker(*, frame_rate: int | None = None) -> ByteTrackWrapper:
