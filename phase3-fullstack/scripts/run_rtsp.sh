@@ -24,9 +24,16 @@ mkdir -p "${LOG_DIR}"
 if [[ ! -f "${VIDEO}" ]]; then
   echo "video not found at ${VIDEO}" >&2; exit 1
 fi
-if ! ss -ltn 2>/dev/null | grep -q ':8554'; then
+_listening_8554() {
+  if command -v ss >/dev/null 2>&1; then
+    ss -ltn 2>/dev/null | grep -q ':8554'
+  else
+    lsof -nP -iTCP:8554 -sTCP:LISTEN 2>/dev/null | grep -q LISTEN
+  fi
+}
+if ! _listening_8554; then
   echo "no RTSP server listening on :8554 — start MediaMTX first" >&2
-  echo "  (e.g. ${ROOT}/bin/mediamtx ${ROOT}/configs/mediamtx.yml)" >&2
+  echo "  (e.g. mediamtx ${ROOT}/configs/mediamtx.yml)" >&2
   exit 1
 fi
 
@@ -34,7 +41,7 @@ echo "[run_rtsp] pushing loop: ${VIDEO} -> rtsp://127.0.0.1:8554/wadi_saqra"
 # Record the ffmpeg start wall-clock (seconds since epoch, float). The signal
 # simulator reads this so its phase transitions stay locked to the video.
 # Written atomically so a partial read never happens.
-printf '%s' "$(date +%s.%N)" > "${ROOT}/data/ffmpeg_start.txt.tmp"
+printf '%s' "$(python3 -c 'import time; print(time.time())')" > "${ROOT}/data/ffmpeg_start.txt.tmp"
 mv "${ROOT}/data/ffmpeg_start.txt.tmp" "${ROOT}/data/ffmpeg_start.txt"
 exec ffmpeg -hide_banner -loglevel warning \
   -re -stream_loop -1 -i "${VIDEO}" \

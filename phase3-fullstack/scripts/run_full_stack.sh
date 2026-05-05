@@ -11,6 +11,12 @@
 
 set -euo pipefail
 
+# Ensure brew bin (ffmpeg, mediamtx) is on PATH for any child process we spawn
+# or that uvicorn later spawns via subprocess.
+if [[ -x /opt/homebrew/bin/brew ]]; then
+    eval "$(/opt/homebrew/bin/brew shellenv)"
+fi
+
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 PHASE3="${ROOT}/phase3-fullstack"
 VENV="${ROOT}/.venv"
@@ -21,8 +27,33 @@ mkdir -p "${LOG_DIR}"
 : "${TRAFFIC_INTEL_JWT_SECRET:=dev-secret-change-in-prod-aaa111}"
 export TRAFFIC_INTEL_JWT_SECRET
 
+# Source repo .env if present so ANTHROPIC_API_KEY (and other secrets) are
+# available to uvicorn. Format: KEY=VALUE per line, # comments allowed.
+if [[ -f "${ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}/.env" ]]; then
+    set -a
+    # shellcheck disable=SC1091
+    source "${ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}/.env"
+    set +a
+fi
+
+# macOS workaround: PyTorch wheel ships its own libomp, brew lightgbm uses
+# brew's libomp. Allow duplicates and pin to single thread to avoid deadlock.
+export KMP_DUPLICATE_LIB_OK=TRUE
+export OMP_NUM_THREADS=1
+# YOLO backend is much lighter than RF-DETR on Apple Silicon and avoids the
+# torch graph-compile path that has been hanging during model load.
+: "${DETECTOR_BACKEND:=ultralytics}"
+: "${DETECTOR_DEVICE:=mps}"
+: "${DETECTOR_FP16:=0}"
+export DETECTOR_BACKEND DETECTOR_DEVICE DETECTOR_FP16
+
 _is_listening() {
-    ss -ltn "sport = :$1" 2>/dev/null | grep -q ":$1"
+    if command -v ss >/dev/null 2>&1; then
+        ss -ltn "sport = :$1" 2>/dev/null | grep -q ":$1"
+    else
+        # macOS fallback
+        lsof -nP -iTCP:"$1" -sTCP:LISTEN 2>/dev/null | grep -q LISTEN
+    fi
 }
 
 echo "[run_full_stack] venv=${VENV}  root=${ROOT}"
